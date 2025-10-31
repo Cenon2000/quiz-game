@@ -1,0 +1,261 @@
+:root{
+  --brand-1:#4f46e5; --brand-2:#3b82f6; --text-on:#fff;
+  --radius:16px; --shadow:0 10px 30px rgba(0,0,0,.1);
+}
+
+/* Basis + Overflow-Schutz */
+*{box-sizing:border-box}
+html,body{height:100%; width:100%; overflow-x:hidden; -webkit-text-size-adjust:100%}
+
+body{
+  margin:0; font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial;
+  color:var(--text-on);
+  background:linear-gradient(135deg,var(--brand-1),var(--brand-2));
+}
+
+.container{
+  width: 100%;
+  max-width: 1100px;
+  margin-inline: auto;
+  padding-inline: clamp(12px, 4vw, 24px);
+  min-width: 0;
+}
+
+.site-header{background:rgba(0,0,0,.15);backdrop-filter:blur(6px)}
+.brand{margin:0;padding:1.1rem 0;font-weight:700}
+
+.site-main{
+  min-height:calc(100dvh - 140px);
+  display:grid; place-items:center;
+  width:100%;
+}
+
+/* Card */
+.form-card{
+  background:#fff; color:#0f172a;
+  border-radius:var(--radius); box-shadow:var(--shadow);
+  /* unten genug Platz für die sticky Nav */
+  padding: clamp(12px, 3.5vw, 20px) clamp(12px, 3.5vw, 20px) clamp(70px, 14vw, 120px);
+  width: 100%; max-width: 100%;
+  margin: 1rem auto;
+  overflow-wrap:anywhere;
+}
+
+.form-grid{display:grid;gap:1rem; min-width:0;}
+label{display:block;font-weight:600;margin-bottom:.35rem}
+input[type="text"],input[type="number"]{
+  width:100%; max-width:100%;
+  padding:.85rem 1rem; border:1px solid #e2e8f0; border-radius:12px; font:inherit;
+}
+.helper{color:#64748b} .small{font-size:.9rem}
+
+/* Stepper */
+.stepper{
+  display:grid; grid-template-columns:repeat(4,1fr); gap:.5rem;
+  list-style:none; padding:0; margin:0 0 1rem; min-width:0;
+}
+.stepper li{
+  text-align:center; padding:.6rem .5rem; border-radius:12px;
+  background:#f1f5f9; color:#334155; font-weight:700; font-size:.95rem;
+}
+.stepper li.active{ background:#4f46e5; color:#fff }
+
+/* Steps */
+.step{ display:none }
+.step.active{ display:block }
+.step-head{ display:flex; align-items:center; justify-content:space-between; gap:.75rem; flex-wrap:wrap; min-width:0; }
+.step-tools{ display:flex; gap:.5rem; flex-wrap:wrap; min-width:0; }
+.chip{ border:1px solid #e2e8f0; background:#fff; border-radius:999px; padding:.4rem .8rem; cursor:pointer; }
+
+/* --- Board-Setup --- */
+.boards-config{ margin-top:.75rem }
+.cfg-grid{ display:grid; gap:1rem; grid-template-columns:1fr; min-width:0; }
+@media (min-width:700px){ .cfg-grid{ grid-template-columns:1fr 1fr } }
+
+.cfg-card{
+  border:1px solid #e2e8f0; border-radius:12px; padding:1rem; background:#f8fafc;
+}
+.cfg-card h3{ margin:.2rem 0 .4rem; line-height:1.2; }
+
+@media (max-width: 600px){
+  .cfg-card{ padding:.7rem .8rem; }
+  .cfg-card label{
+    display:grid;
+    grid-template-columns:auto 1fr;
+    align-items:center;
+    gap:.5rem;
+    margin-bottom:.15rem;
+  }
+  .cfg-card label input[type="number"]{
+    justify-self:end;
+    width: 90px;             /* schmaler als vorher */
+    padding:.45rem .55rem;   /* kompakter */
+    font-size:.9rem;         /* kleiner */
+    line-height:1.15;
+    border-radius:10px;
+  }
+  .cfg-card .small{ font-size:.82rem; }
+}
+@media (max-width: 380px){
+  .cfg-card label input[type="number"]{
+    width: 80px; font-size:.85rem; padding:.4rem .5rem;
+  }
+}
+
+
+/* Board → Kategorien im Grid */
+.board{ margin-top:.75rem; min-width:0; }
+.cat-grid{ display:grid; gap:1rem; grid-template-columns:1fr; min-width:0; }
+@media (min-width:900px){ .cat-grid{ grid-template-columns:repeat(2,1fr) } }
+
+/* Kategorien als <details> */
+.cat-card{
+  border:1px solid #e5e7eb; border-radius:12px; background:#fbfdff;
+  overflow:hidden;
+}
+.cat-card > summary{
+  list-style:none; cursor:pointer; padding:1rem;
+  display:flex; align-items:center; gap:.75rem; justify-content:space-between;
+  flex-wrap: wrap; min-width:0;
+}
+.cat-card > summary::-webkit-details-marker{ display:none }
+.cat-title{ font-weight:700; flex: 1 1 220px; min-width: 0; }
+.badge{ background:#eef2ff; color:#3730a3; border-radius:999px; padding:.2rem .6rem; font-weight:700; font-size:.85rem }
+
+.qa-grid{ display:grid; gap:.6rem; padding:0 1rem 1rem; min-width:0; }
+.qa-row{ display:grid; grid-template-columns:1fr 1fr; gap:.5rem; align-items:center; min-width:0; }
+.qa-row input[type="text"]{ padding:.6rem .8rem; min-width:0; }
+.points{ justify-self:start; font-size:.85rem; color:#334155; }
+
+/* Sticky Footer-Navigation */
+.wizard-nav{
+  position: sticky; bottom: 0; left: 0; right: 0;
+  display: flex; flex-wrap: wrap; align-items: center; gap: .7rem;
+  /* ► Mehr Abstand zwischen Trennlinie (border-top) und Buttons */
+  padding: 1.4rem .9rem 1rem;    /* TOP deutlich größer gemacht */
+  min-height: 72px;              /* Mindesthöhe sorgt zusätzlich für Abstand */
+  background: linear-gradient(180deg,#ffffff 0%, #ffffff 80%, rgba(255,255,255,.95) 100%);
+  
+  max-width:100%;
+  padding: 1.6rem .9rem 1rem;   /* TOP noch etwas größer */
+  min-height: 76px;             /* minimal höher, damit optisch Luft bleibt */
+  z-index: 10;                  /* liegt sicher über dem Inhalt */
+}
+/* kleiner Top-Abstand zusätzlich je Button */
+.wizard-nav .btn-primary,
+.wizard-nav .btn-secondary{
+  margin-top: .35rem;
+}
+
+.spacer{ flex:1 }
+.btn-row{ 
+  display:flex; 
+  gap:.75rem; 
+  flex-wrap:wrap;
+}
+
+.btn-primary,.btn-secondary{
+  border:none; border-radius:12px; padding:.9rem 1.1rem; font-weight:700; cursor:pointer; max-width:100%;
+}
+.btn-primary{ background:#4f46e5; color:#fff }
+.btn-secondary{ background:#e2e8f0; color:#0f172a }
+.hide{ display:none }
+
+/* Review */
+.review{
+  border:1px solid #e2e8f0; border-radius:12px; padding:1rem; background:#f8fafc;
+  max-width: 100%; overflow-x: auto;
+}
+.review h3{ margin:.25rem 0 }
+.review ul{ margin:.25rem 0 1rem 1.25rem; padding-right: .5rem; }
+
+/* Mehr Luft vor dem "Eingabefelder vorbereiten"-Button */
+.boards-config .btn-row{ margin-top: 2rem; }
+
+/* Mobile-Fokus */
+@media (max-width: 520px){
+  /* Stepper wird horizontal scrollbar */
+  .stepper{
+    display: flex;
+    gap: 8px;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    scroll-snap-type: x mandatory;
+    padding-bottom: 6px;
+  }
+  .stepper li{
+    flex: 0 0 auto;
+    min-width: 160px;
+    scroll-snap-align: start;
+    white-space: nowrap;
+    font-size: .9rem;
+    padding: .55rem .75rem;
+  }
+
+  /* QA-Raster einkolumnig */
+  .qa-row{ grid-template-columns: 1fr; }
+  .points{ justify-self: start; margin-top: .25rem; font-size: .8rem; }
+  .qa-row input[type="text"]{ width: 100%; }
+
+  /* Buttons kompakter */
+  .btn-primary, .btn-secondary{ padding: .75rem .9rem; font-size: .95rem; }
+}
+
+/* Ab ~521px wieder Grid für den Stepper */
+@media (min-width: 521px){
+  .stepper{ display: grid; grid-template-columns: repeat(4,1fr); gap:.5rem; }
+  .stepper li{ text-align:center; padding:.6rem .5rem; border-radius:12px; }
+}
+
+/* Generelle „Text bricht immer“-Netze */
+.qa-grid, .review, .form-card, .cat-card, .stepper, .wizard-nav{
+  overflow-wrap: anywhere; word-break: break-word;
+}
+
+/* Header Layout */
+.header-row {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+/* Zurück-Button */
+.back-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  border: none;
+  background: rgba(0, 0, 0, 0.25);
+  color: #fff;
+  font-size: 1.3rem;
+  cursor: pointer;
+  box-shadow: 0 3px 8px rgba(0, 0, 0, 0.3);
+  transition: background 0.25s, transform 0.15s;
+}
+
+.back-btn:hover {
+  background: rgba(255, 255, 255, 0.2);
+  transform: translateY(-1px);
+}
+
+.back-btn:active {
+  transform: translateY(0);
+}
+
+/* Pfeil etwas schöner (optional) */
+.back-btn .arrow {
+  font-weight: 700;
+  line-height: 1;
+}
+
+/* Responsiv – auf kleineren Screens etwas kleiner */
+@media (max-width: 520px) {
+  .back-btn {
+    width: 34px;
+    height: 34px;
+    font-size: 1.1rem;
+  }
+}

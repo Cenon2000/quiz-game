@@ -1,0 +1,646 @@
+:root{
+  --brand-1:#4f46e5; --brand-2:#3b82f6;
+  --text:#e5e7eb;
+  --radius:14px; --shadow:0 10px 30px rgba(0,0,0,.35);
+  --stage-top:24px;
+
+  /* Mobile Höhen */
+  --h-header: 56px;
+  --h-footer: 56px;
+  --controls-h: 64px; /* wird per JS gesetzt */
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+
+  --flash-green: 34,197,94;   /* #22c55e */
+  --flash-red:   239,68,68;   /* #ef4444 */
+}
+
+/* ===== Grundlayout ===== */
+*{box-sizing:border-box}
+html,body{
+  height:100%;
+  margin:0;
+  -webkit-text-size-adjust:100%;
+  display:flex;
+  flex-direction:column;
+}
+body{
+  background:linear-gradient(135deg,var(--brand-1),var(--brand-2));
+  color:var(--text);
+  font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial;
+}
+main.game-main{
+  flex:1;
+  display:flex;
+  flex-direction:column;
+}
+.container{ width:min(1200px,92vw); margin-inline:auto }
+
+/* Header/Footer */
+.game-header{
+  background:rgba(0,0,0,.25);
+  backdrop-filter:blur(6px);
+  position:sticky; top:0; z-index:10;
+}
+.header-row{
+  display:flex; align-items:center; gap:.75rem; justify-content:flex-start;
+  padding:10px 0;
+}
+.header-row h1{ margin:0; font-size:1.4rem; flex:1 }
+.back-btn{
+  width:38px; height:38px; border-radius:50%; border:0;
+  background:rgba(0,0,0,.3); color:#fff; box-shadow:0 4px 10px rgba(0,0,0,.35);
+  cursor:pointer;
+}
+.back-btn:hover{ background:rgba(255,255,255,.18) }
+
+.game-footer{
+  margin-top:auto;
+  padding:16px 0;
+  background:rgba(0,0,0,.25);
+  text-align:center;
+  color:#e5e7eb;
+  font-size:.9rem;
+  border-top:1px solid rgba(255,255,255,.1);
+}
+
+/* ===== Stage: zentriertes Board + separate Sidebar ===== */
+.game-layout{
+  position:relative;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  min-height:calc(100svh - 80px);
+  width:100%;
+}
+
+/* Sidebar (Desktop links, eigenständige Spalte) */
+.sidebar{
+  position:absolute;
+  left:20px;
+  top:var(--stage-top);
+  width:220px;
+  display:flex;
+  flex-direction:column;
+  gap:10px;
+  z-index:2;
+}
+
+/* Board-Area */
+.board-area{
+  max-width:900px;
+  width:100%;
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  gap:20px;
+  min-height:0;
+  padding-top:var(--stage-top);
+}
+
+/* Host + Spieler */
+.host-box{
+  background:rgba(255,255,255,.12);
+  border:1px solid rgba(255,255,255,.2);
+  border-radius:10px;
+  padding:8px 10px;
+}
+.host-label{ font-size:.85rem; color:#cbd5e1; margin-bottom:3px }
+.host-name{ font-weight:800 }
+
+.player-list{
+  list-style:none; margin:12px 0 0; padding:0;
+  display:flex; flex-direction:column; gap:6px;
+}
+.player-item{
+  display:flex; justify-content:space-between; align-items:center;
+  background:rgba(0,0,0,.25);
+  border-radius:10px; padding:6px 10px;
+  font-weight:600; color:#fff;
+}
+.player-item.current{
+  background:rgba(79,70,229,.35);
+  outline:2px solid #60a5fa;
+  box-shadow:0 0 8px rgba(96,165,250,.4);
+}
+.player-item.buzzing{
+  outline:2px dashed #fbbf24;
+  box-shadow:0 0 10px rgba(251,191,36,.4);
+  background:rgba(251,191,36,.18);
+}
+.player-score{ font-weight:700 }
+
+/* ===== Frage/Antwort-Leiste ===== */
+.question-bar{
+  width:fit-content;
+  max-width:100%;
+  background:linear-gradient(135deg, rgba(79,70,229,.9), rgba(59,130,246,.9));
+  border:1px solid rgba(255,255,255,.2);
+  border-radius:var(--radius);
+  padding:12px;
+  box-shadow:var(--shadow);
+  display:grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap:12px;
+  align-items:stretch;
+}
+.q-box, .a-box{
+  background:rgba(0,0,0,.18);
+  border:1px solid rgba(255,255,255,.25);
+  border-radius:12px;
+  padding:10px 12px;
+  min-width:0;
+}
+.q-label, .a-label{
+  font-size:.8rem; letter-spacing:.02em; color:#cbd5e1;
+  margin-bottom:4px; font-weight:700; text-transform:uppercase;
+}
+.q-text{ font-weight:600; color:#fff; font-size:1.05rem; line-height:1.35; word-break:break-word }
+.a-text{ color:#d9f99d; font-weight:800; line-height:1.35; word-break:break-word }
+.a-box.hidden{ display:none }
+
+/* ===== Board (zentriert) ===== */
+.board-wrap{
+  background:transparent; border:none; padding:0;
+  width:100%;
+  flex:1;
+  display:flex; align-items:center; justify-content:center;
+  min-height:0;
+}
+.board-scroll{
+  overflow-x:auto; overflow-y:hidden; max-width:100%;
+}
+.board-grid{
+  display:grid; gap:6px; grid-auto-rows:64px; justify-content:center;
+}
+.board-grid.narrow{
+  grid-template-columns:repeat(var(--cols), minmax(120px, 170px));
+}
+.cell{
+  display:flex; align-items:center; justify-content:center;
+  text-align:center; font-weight:800; border-radius:10px; padding:6px;
+  border:1px solid #334155; background:rgba(255,255,255,.12);
+  color:#fff; word-wrap:break-word;
+}
+.cell.header{ background:rgba(255,255,255,.18); font-weight:900 }
+/* Bereits verwendete Fragen deutlich rot markieren */
+.cell.q.used {
+  opacity: 1; /* bleibt klar lesbar */
+  background: #ef4444; /* kräftiges Rot */
+  color: #fff;
+  border-color: #b91c1c;
+  box-shadow: 0 0 6px rgba(239, 68, 68, 0.5);
+}
+
+.cell.q.host-disabled{ pointer-events:none }
+
+/* Buttons */
+.answer-actions{
+  display:flex; justify-content:center; gap:12px;
+  width:fit-content; max-width:100%;
+}
+.btn{
+  border:none; border-radius:10px; padding:.8rem 1.2rem;
+  font-weight:700; cursor:pointer; font-size:1rem;
+}
+.btn.primary{ background:#4f46e5; color:#fff }
+.btn.danger{ background:#b91c1c; color:#fff }
+.btn:disabled{ opacity:.5; cursor:default }
+
+/* Buzzer */
+.buzzer{
+  display:flex; align-items:center; gap:10px;
+  background:rgba(0,0,0,.25);
+  border:1px solid rgba(255,255,255,.2);
+  border-radius:var(--radius);
+  padding:10px 12px;
+}
+.buzzer.hidden{ display:none }
+.buzzer-btns{ display:flex; gap:8px; flex-wrap:wrap }
+
+/* Status */
+.status{ margin-top:6px; color:#fde68a }
+
+/* Rollen */
+.host-only.hidden, .viewer-only.hidden{ display:none }
+
+/* ===== Mobile: kein Vertikal-Scroll, Drawer, Trigger unten links ===== */
+@media (max-width:860px){
+  html,body{ height:100svh; overflow:hidden }
+  .game-layout{ height:100%; min-height:100%; overflow:hidden; align-items:stretch }
+  .board-area{
+    height:calc(100svh - var(--h-header) - var(--h-footer));
+    padding-top:0;
+    display:flex; flex-direction:column; align-items:center; gap:10px; overflow:hidden;
+  }
+  .question-bar{ grid-template-columns:1fr; gap:10px; padding:10px; max-width:100% }
+  .q-box,.a-box{ min-width:0 } .q-text{ font-size:.98rem }
+
+  /* Host sieht auf Mobile beide Felder nebeneinander */
+body.is-host .question-bar{
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap:10px;
+}
+
+/* Falls es wirklich extrem eng wird, kannst du optional auf 1 Spalte fallen:
+@media (max-width: 380px){
+  body.is-host .question-bar{ grid-template-columns: 1fr; }
+}
+*/
+
+
+  .board-wrap{ flex:1; min-height:0; width:100%; display:flex; align-items:center; justify-content:center; overflow:hidden }
+  .board-scroll{ max-width:100%; overflow-x:auto; overflow-y:hidden }
+
+  /* Buttons fix unten */
+  .answer-actions{
+    position:fixed; left:50%; transform:translateX(-50%);
+    bottom:calc(8px + var(--safe-bottom));
+    z-index:30; background:rgba(0,0,0,.18); backdrop-filter:blur(6px);
+    border-radius:12px; padding:6px 10px;
+  }
+
+  /* Sidebar als Drawer */
+  .sidebar{
+    position:fixed; top:var(--h-header);
+    bottom:calc(var(--controls-h) + var(--safe-bottom) + 8px);
+    left:0; width:260px; padding:12px;
+    background:rgba(10,15,30,.96);
+    border-right:1px solid rgba(255,255,255,.14);
+    box-shadow:0 10px 30px rgba(0,0,0,.45);
+    transform:translateX(-100%);
+    transition:transform .25s ease;
+    overflow-y:auto; z-index:20;
+    display:flex; flex-direction:column; align-items:stretch; gap:12px;
+  }
+  .sidebar.open{ transform:translateX(0) }
+
+  .drawer-scrim{
+    position:fixed; inset:0;
+    background:rgba(0,0,0,.35);
+    backdrop-filter:blur(2px);
+    z-index:15;
+  }
+
+  /* Trigger unten links (Höhe = Controls) */
+  .turn-indicator{
+    position:fixed; left:0;
+    bottom:calc(var(--controls-h) + var(--safe-bottom) + 12px);
+    width:46px; height:112px;
+    border:1px solid rgba(255,255,255,.25); border-left:none;
+    border-radius:0 12px 12px 0;
+    background:rgba(0,0,0,.35); color:#fff;
+    display:flex; flex-direction:column; align-items:center; justify-content:center;
+    gap:6px; padding:8px 6px; cursor:pointer; z-index:25;
+    box-shadow:0 6px 18px rgba(0,0,0,.35);
+    backdrop-filter:blur(6px);
+  }
+  .turn-indicator:hover{ background:rgba(255,255,255,.14) }
+  .turn-indicator svg{ opacity:.95 }
+  .turn-indicator .ti-name{
+    writing-mode:vertical-rl; text-orientation:mixed; font-weight:800; font-size:.85rem; letter-spacing:.02em;
+  }
+  .turn-indicator.buzzing{ outline:2px solid #fbbf24; box-shadow:0 0 12px rgba(251,191,36,.45) }
+  .sidebar.open ~ .turn-indicator svg{ transform:scaleX(-1) }
+
+  .game-footer{ position:relative; z-index:5 }
+}
+
+/* Desktop: Button & Scrim ausblenden */
+@media (min-width:861px){
+  .drawer-scrim, .turn-indicator{ display:none !important }
+}
+
+/* --- Hilfreich für [hidden] auf dem Scrim --- */
+.drawer-scrim[hidden] { display: none !important; }
+
+/* Frage/Antwort: auf schmalen Screens automatisch 1-2 Spalten je nach Platz */
+.question-bar{
+  display:grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap:12px;
+}
+@media (max-width: 860px){
+  /* Auf Mobile adaptiv: 2 Spalten, wenn Platz >= 480px, sonst 1 Spalte */
+  .question-bar{
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap:10px;
+  }
+}
+
+/* Board bleibt mittig, nur horizontal scrollen wenn nötig */
+.board-wrap{ display:flex; align-items:center; justify-content:center; overflow:hidden; }
+.board-scroll{ overflow-x:auto; overflow-y:hidden; max-width:100%; }
+
+/* ===== Mobile: Off-Canvas Sidebar + Trigger ===== */
+@media (max-width: 860px){
+  /* Sidebar als Drawer – zwischen Header und Buttons „eingespannt“ */
+  .sidebar{
+    position:fixed;
+    top: var(--h-header);
+    bottom: calc(var(--controls-h) + var(--safe-bottom) + 8px);
+    left:0;
+    width: 260px;
+    padding: 12px;
+    background: rgba(10,15,30,.96);
+    border-right: 1px solid rgba(255,255,255,.14);
+    box-shadow: 0 10px 30px rgba(0,0,0,.45);
+    transform: translateX(-100%);
+    transition: transform .25s ease;
+    overflow-y: auto;
+    z-index: 40; /* höher als Board */
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+  .sidebar.open{ transform: translateX(0); }
+
+  .drawer-scrim{
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.35);
+    backdrop-filter: blur(2px);
+    z-index: 35;
+  }
+
+  /* Trigger-Button: groß genug, an linker Kante, über allem klickbar */
+  .turn-indicator{
+    position: fixed;
+    left: 0;
+    bottom: calc(var(--controls-h) + var(--safe-bottom) + 12px);
+    width: 56px;              /* etwas breiter */
+    height: 132px;            /* etwas höher */
+    border: 1px solid rgba(255,255,255,.25);
+    border-left: none;
+    border-radius: 0 12px 12px 0;
+    background: rgba(0,0,0,.40);
+    color: #fff;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    padding: 10px 6px;
+    cursor: pointer;
+    z-index: 50;              /* ÜBER Drawer & Controls */
+    box-shadow: 0 6px 18px rgba(0,0,0,.35);
+    backdrop-filter: blur(6px);
+    -webkit-tap-highlight-color: transparent;
+  }
+  .turn-indicator:hover{ background: rgba(255,255,255,.16); }
+  .turn-indicator svg{ opacity: .95 }
+  .turn-indicator .ti-name{
+    writing-mode: vertical-rl;
+    text-orientation: mixed;
+    font-weight: 800;
+    font-size: .9rem;
+    letter-spacing: .02em;
+  }
+  .turn-indicator.buzzing{
+    outline: 2px solid #fbbf24;
+    box-shadow: 0 0 12px rgba(251,191,36,.45);
+  }
+
+  /* Pfeil umdrehen, wenn Drawer offen (sind Geschwister im DOM) */
+  .sidebar.open ~ .turn-indicator svg{ transform: scaleX(-1); }
+
+  /* Kein Vertikal-Scroll des Gesamtlayouts auf Mobile */
+  html, body{
+    height: 100svh;
+    overflow: hidden;
+  }
+  .game-layout{
+    height: 100%;
+    min-height: 100%;
+    align-items: stretch;
+    overflow: hidden;
+  }
+  .board-area{
+    height: calc(100svh - var(--h-header) - var(--h-footer));
+    overflow: hidden;
+    gap: 10px;
+  }
+
+  /* Host-Buttons fix unten, mittig */
+  .answer-actions{
+    position: fixed;
+    left: 50%;
+    transform: translateX(-50%);
+    bottom: calc(8px + var(--safe-bottom));
+    z-index: 45; /* unter dem Trigger, aber über Board */
+    background: rgba(0,0,0,.18);
+    backdrop-filter: blur(6px);
+    border-radius: 12px;
+    padding: 6px 10px;
+  }
+}
+
+/* Desktop: Trigger & Scrim ausblenden */
+@media (min-width: 861px){
+  .drawer-scrim, .turn-indicator{ display: none !important; }
+}
+
+/* --- Harte z-index-Garantie für Mobile --- */
+@media (max-width: 860px){
+  .sidebar{ z-index: 40; }
+  .drawer-scrim{ z-index: 35; }
+  .answer-actions{ z-index: 45; }
+  .turn-indicator{ z-index: 50; } /* Button immer oben */
+}
+/* Falls hidden noch Style vererbt: */
+.drawer-scrim[hidden]{ display: none !important; }
+
+@media (max-width: 860px){
+  /* Trigger unten LINKS ganz am Rand */
+  .turn-indicator{
+    position: fixed;
+    left: 0;
+    bottom: calc(var(--safe-bottom) + 8px); /* ganz unten, minimaler Abstand */
+    width: 56px;
+    height: 132px;
+    border: 1px solid rgba(255,255,255,.25);
+    border-left: none;
+    border-radius: 0 12px 12px 0;
+    background: rgba(0,0,0,.40);
+    color: #fff;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    padding: 10px 6px;
+    cursor: pointer;
+    z-index: 50;
+    box-shadow: 0 6px 18px rgba(0,0,0,.35);
+    backdrop-filter: blur(6px);
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  .turn-indicator:hover {
+    background: rgba(255,255,255,.16);
+  }
+
+  .turn-indicator svg {
+    opacity: .95;
+  }
+
+  .turn-indicator .ti-name {
+    writing-mode: vertical-rl;
+    text-orientation: mixed;
+    font-weight: 800;
+    font-size: .9rem;
+    letter-spacing: .02em;
+  }
+
+  .turn-indicator.buzzing {
+    outline: 2px solid #fbbf24;
+    box-shadow: 0 0 12px rgba(251,191,36,.45);
+  }
+
+  /* Pfeil umdrehen, wenn offen */
+  .sidebar.open ~ .turn-indicator svg {
+    transform: scaleX(-1);
+  }
+}
+
+/* ===== Status-Text immer über den Buttons sichtbar ===== */
+.status {
+  position: relative;
+  z-index: 10;
+  margin-top: 12px;
+  color: #fde68a;
+  font-size: 0.95rem;
+  text-align: center;
+  padding-bottom: calc(var(--controls-h) + 20px); /* Abstand unterhalb, damit er nicht überlappt */
+}
+
+/* === Host-Box und Sidebar optisch an das restliche Design angleichen === */
+.sidebar {
+  background: linear-gradient(135deg, rgba(79,70,229,0.25), rgba(59,130,246,0.25));
+  border-right: 1px solid rgba(255,255,255,0.1);
+  box-shadow: 0 10px 25px rgba(0,0,0,0.3);
+}
+
+/* Host-Anzeige */
+.host-box {
+  background: rgba(79,70,229,0.25);
+  border: 1px solid rgba(255,255,255,0.25);
+  border-radius: 12px;
+  padding: 10px;
+  color: #fff;
+  box-shadow: 0 2px 8px rgba(79,70,229,0.4);
+}
+
+/* Spieler-Elemente */
+.player-item {
+  background: rgba(59,130,246,0.25);
+  border: 1px solid rgba(255,255,255,0.2);
+  color: #f8fafc;
+  border-radius: 12px;
+  padding: 8px 12px;
+  font-weight: 600;
+  transition: background 0.3s ease, box-shadow 0.3s ease;
+}
+
+/* Aktiver Spieler */
+.player-item.current {
+  background: rgba(99,102,241,0.45);
+  box-shadow: 0 0 10px rgba(96,165,250,0.5);
+  border-color: rgba(255,255,255,0.4);
+}
+
+/* Spieler, die buzzern */
+.player-item.buzzing {
+  background: rgba(251,191,36,0.3);
+  outline: 2px dashed #facc15;
+  box-shadow: 0 0 10px rgba(251,191,36,0.5);
+}
+
+/* ===== Feedback-Leuchten für Richtig/Falsch ===== */
+
+/* Vollflächiges Overlay für das Leuchten */
+#globalFlashOverlay {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 2147483647;
+  opacity: 0;
+}
+
+/* Aktivierung */
+#globalFlashOverlay.flash-correct,
+#globalFlashOverlay.flash-wrong {
+  animation: flashEdge 2s ease-out forwards;
+  will-change: opacity, transform;
+}
+
+/* ========== Handy / Standard ========== */
+#globalFlashOverlay.flash-correct {
+  box-shadow:
+    inset 0 0 0 6px rgba(var(--flash-green), 0.95),
+    0 0 100px 35px rgba(var(--flash-green), 0.55),
+    0 0 180px 70px rgba(var(--flash-green), 0.35),
+    0 0 300px 110px rgba(var(--flash-green), 0.22);
+}
+
+#globalFlashOverlay.flash-wrong {
+  box-shadow:
+    inset 0 0 0 6px rgba(var(--flash-red), 0.95),
+    0 0 100px 35px rgba(var(--flash-red), 0.55),
+    0 0 180px 70px rgba(var(--flash-red), 0.35),
+    0 0 300px 110px rgba(var(--flash-red), 0.22);
+}
+
+/* ========== PC / große Bildschirme ========== */
+@media (min-width: 861px) {
+  #globalFlashOverlay.flash-correct {
+    box-shadow:
+      inset 0 0 0 8px rgba(var(--flash-green), 0.95),
+      0 0 200px 70px rgba(var(--flash-green), 0.6),
+      0 0 360px 140px rgba(var(--flash-green), 0.4),
+      0 0 600px 250px rgba(var(--flash-green), 0.25);
+  }
+
+  #globalFlashOverlay.flash-wrong {
+    box-shadow:
+      inset 0 0 0 8px rgba(var(--flash-red), 0.95),
+      0 0 200px 70px rgba(var(--flash-red), 0.6),
+      0 0 360px 140px rgba(var(--flash-red), 0.4),
+      0 0 600px 250px rgba(var(--flash-red), 0.25);
+  }
+}
+
+/* Ein-/Ausblenden */
+@keyframes flashEdge {
+  0%   { opacity: 0; transform: scale(1); }
+  12%  { opacity: 1; transform: scale(1.01); }
+  75%  { opacity: 1; transform: scale(1.01); }
+  100% { opacity: 0; transform: scale(1); }
+}
+
+/* Frage-Kacheln (normale Felder) – leicht transparent */
+.cell.q{
+  background: rgba(255,255,255,0.12);
+  border-color: rgba(255,255,255,0.22);
+}
+
+/* Kategorie-Kacheln – leicht abgesetzt & etwas kräftiger */
+.cell.header{
+  background: linear-gradient(
+    135deg,
+    rgba(79,70,229,0.35),
+    rgba(59,130,246,0.35)
+  );
+  border-color: rgba(255,255,255,0.38);
+  color: #f1f5ff;
+  text-transform: uppercase;
+  letter-spacing: .02em;
+  font-weight: 900;
+}
+
+/* Bereits verwendete Frage bleibt klar rot (hat Vorrang) */
+.cell.q.used{
+  background: #ef4444 !important;
+  border-color: #b91c1c !important;
+  color: #fff !important;
+  box-shadow: 0 0 6px rgba(239, 68, 68, 0.5);
+}

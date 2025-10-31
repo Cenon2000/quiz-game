@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Quiz – Spiel</title>
+  <link rel="stylesheet" href="css/game.css" />
+</head>
+<body>
+  <header class="game-header">
+    <div class="container header-row">
+      <button class="back-btn" type="button" aria-label="Zurück" onclick="window.history.back()"><span>←</span></button>
+      <h1 id="gameTitle">Quiz</h1>
+    </div>
+  </header>
+
+  <main class="game-main">
+    <div class="container game-layout">
+
+      <!-- EINZIGE Sidebar (Desktop links / Mobile Drawer) -->
+      <aside id="sidebar" class="sidebar">
+        <div id="hostBox" class="host-box">
+          <div class="host-label">Host</div>
+          <div id="hostNameBox" class="host-name">—</div>
+        </div>
+        <ul id="playerList" class="player-list"></ul>
+      </aside>
+
+      <!-- Scrim (zum Schließen tippen, nur Mobile sichtbar wenn offen) -->
+      <div id="drawerScrim" class="drawer-scrim" hidden></div>
+
+      <!-- Ausklapp-Button (nur Mobile sichtbar) -->
+      <button
+        id="turnIndicator"
+        class="turn-indicator"
+        type="button"
+        aria-label="Spielerliste öffnen"
+        aria-controls="sidebar"
+        aria-expanded="false"
+        hidden
+      >
+        <svg width="22" height="22" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+          <path d="M9 6l6 6-6 6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+        <span class="ti-name">—</span>
+      </button>
+
+      <!-- Spielfläche (zentriert) -->
+      <section class="board-area">
+
+        <!-- Frage/Antwort oben (Antwort nur Host) -->
+        <section id="questionBar" class="question-bar" aria-live="polite">
+          <div class="q-box">
+            <div class="q-label">Frage</div>
+            <div id="qText" class="q-text">Wähle ein Punktefeld, um die Frage zu zeigen.</div>
+          </div>
+          <div id="qAnswerWrap" class="a-box host-only hidden">
+            <div class="a-label">Antwort (nur Host)</div>
+            <div id="qAnswer" class="a-text">—</div>
+          </div>
+        </section>
+
+        <!-- Board mittig -->
+        <section class="board-wrap">
+          <div class="board-scroll">
+            <div id="boardGrid" class="board-grid narrow" role="grid" aria-live="polite"></div>
+          </div>
+        </section>
+
+        <!-- Richtig/Falsch -->
+        <div class="answer-actions host-only">
+          <button id="btnCorrect" class="btn primary" type="button" disabled>Richtig</button>
+          <button id="btnWrong" class="btn danger" type="button" disabled>Falsch</button>
+        </div>
+
+        <!-- Buzzer -->
+        <section id="buzzerBar" class="buzzer hidden">
+          <div class="buzzer-title">Buzzer offen – Host wählt, wer versucht zu antworten.</div>
+          <div id="buzzerBtns" class="buzzer-btns host-only"></div>
+          <div class="buzzer-hint viewer-only">Meldet euch beim Host, wer buzzern will.</div>
+        </section>
+
+        <div id="status" class="status"></div>
+      </section>
+    </div>
+  </main>
+
+  <script src="JS/game.js"></script>
+</body>
+</html>

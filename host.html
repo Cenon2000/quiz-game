@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Hosten – Quiz Abend</title>
+  <link rel="stylesheet" href="CSS/host.css" />
+</head>
+<body>
+  <header class="site-header">
+    <div class="container header-row">
+    <!-- Zurück-Button -->
+    <button class="back-btn" type="button" aria-label="Zurück" onclick="window.history.back()">
+      <span class="arrow">←</span>
+    </button>
+
+    <h1 class="brand">Quiz Abend</h1>
+  </div>
+  </header>
+
+  <main class="site-main">
+    <div class="container">
+      <section class="form-card" aria-labelledby="host-title">
+        <h2 id="host-title" style="margin-top:0">Neue Lobby erstellen</h2>
+
+        <form id="host-form" novalidate>
+          <div class="form-grid two-col">
+            <!-- … im <form id="host-form"> nach deinen bisherigen Feldern: -->
+<div class="form-grid">
+  <div>
+    <label for="quizSelect">Quiz auswählen</label>
+    <select id="quizSelect" required>
+      <option value="">— bitte wählen —</option>
+    </select>
+    <p class="helper">Wähle ein zuvor erstelltes Quiz (aus „Quiz erstellen“).</p>
+  </div>
+</div>
+
+            <div>
+              <label for="gameName">Spielname</label>
+              <input id="gameName" name="gameName" type="text" required placeholder="z. B. Freitagquiz" />
+              <p class="helper">Wie soll deine Lobby heißen?</p>
+            </div>
+            <div>
+              <label for="nickname">Dein Nickname</label>
+              <input id="nickname" name="nickname" type="text" required placeholder="z. B. Alex" />
+              <p class="helper">Wird in der Lobby angezeigt.</p>
+            </div>
+            <div>
+              <label for="maxPlayers">Max. Spieler</label>
+              <input id="maxPlayers" name="maxPlayers" type="number" min="2" max="50" value="8" required />
+            </div>
+            <div>
+              <label for="pin">PIN (optional)</label>
+              <input id="pin" name="pin" type="password" inputmode="numeric" placeholder="z. B. 1234" />
+              <p class="helper">Leer lassen, falls nicht benötigt.</p>
+            </div>
+          </div>
+
+          <div class="btn-row">
+            <button class="btn-primary" type="submit">Lobby erstellen</button>
+            <a href="index.html" class="action-btn" role="button">Zurück</a>
+          </div>
+        </form>
+
+        <div id="lobby-view" style="display:none; margin-top:1.25rem;">
+          <h3 style="margin:.25rem 0 0;">Lobby erstellt!</h3>
+          <p>Teile diesen Code mit deinen Freunden:</p>
+          <p class="code-chip">
+            <span id="lobby-code">— — — — — —</span>
+            <button id="copy-code" class="btn-primary" type="button">Kopieren</button>
+          </p>
+          <p class="helper">Oder Link schicken: <a id="invite-link" href="#" target="_blank">Einladungslink</a></p>
+        </div>
+      </section>
+    </div>
+  </main>
+
+  <footer class="site-footer"><div class="container"><small>© <span id="year"></span> Quiz Abend</small></div></footer>
+  <script src="JS/host.js"></script>
+</body>
+</html>

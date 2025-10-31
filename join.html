@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Beitreten – Quiz Abend</title>
+  <link rel="stylesheet" href="CSS/join.css" />
+</head>
+<body>
+  <header class="site-header">
+    <div class="container header-row">
+    <!-- Zurück-Button -->
+    <button class="back-btn" type="button" aria-label="Zurück" onclick="window.history.back()">
+      <span class="arrow">←</span>
+    </button>
+
+    <h1 class="brand">Quiz Abend</h1>
+  </div>
+  </header>
+
+  <main class="site-main">
+    <div class="container">
+      <section class="form-card" aria-labelledby="join-title">
+        <h2 id="join-title" style="margin-top:0">Lobby beitreten</h2>
+        <form id="join-form" novalidate>
+          <div class="form-grid">
+            <div>
+              <label for="code">Lobby-Code</label>
+              <input id="code" name="code" type="text" required placeholder="z. B. Q7R9XK" />
+            </div>
+            <div>
+              <label for="nick">Dein Nickname</label>
+              <input id="nick" name="nick" type="text" required placeholder="z. B. Kim" />
+            </div>
+            <div id="pin-wrap" style="display:none;">
+              <label for="join-pin">PIN</label>
+              <input id="join-pin" name="pin" type="password" inputmode="numeric" placeholder="falls erforderlich" />
+            </div>
+          </div>
+          <div class="btn-row">
+            <button class="btn-primary" type="submit">Beitreten</button>
+            <a href="index.html" class="action-btn" role="button">Zurück</a>
+          </div>
+        </form>
+      </section>
+    </div>
+  </main>
+
+  <footer class="site-footer"><div class="container"><small>© <span id="year"></span> Quiz Abend</small></div></footer>
+  <script src="JS/join.js"></script>
+</body>
+</html>

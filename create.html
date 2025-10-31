@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Quiz erstellen – Quiz Abend</title>
+  <link rel="stylesheet" href="CSS/create.css" />
+</head>
+<body>
+  <header class="site-header">
+    <div class="container header-row">
+    <!-- Zurück-Button -->
+    <button class="back-btn" type="button" aria-label="Zurück" onclick="window.history.back()">
+      <span class="arrow">←</span>
+    </button>
+
+    <h1 class="brand">Quiz Abend</h1>
+  </div>
+  </header>
+
+  <main class="site-main">
+    <div class="container">
+      <section class="form-card">
+        <!-- Schritt 1: Grunddaten & Aufbau -->
+        <section class="step active" data-step="1" aria-labelledby="s1-title">
+          <h2 id="s1-title">Grunddaten & Aufbau</h2>
+          <div class="form-grid">
+            <div>
+              <label for="quizTitle">Titel</label>
+              <input id="quizTitle" type="text" required placeholder="z. B. Dein Name und eine Zahl" />
+              <p class="helper">Kurzer, eindeutiger Name für dein Quiz.</p>
+            </div>
+          </div>
+
+          <div class="boards-config">
+            <div class="cfg-grid">
+              <div class="cfg-card">
+                <h3>Board 1</h3>
+                <label>Kategorien
+                  <input id="b1Cats" type="number" min="1" max="10" value="4">
+                </label>
+              </div>
+
+              <div class="cfg-card">
+                <h3>Board 2</h3>
+                <label>Kategorien
+                  <input id="b2Cats" type="number" min="1" max="10" value="4">
+                </label>
+              </div>
+            </div>
+
+            <div class="btn-row">
+              <button class="btn-secondary" id="buildBoards" type="button">Speichern</button>
+            </div>
+          </div>
+        </section>
+
+        <!-- Schritt 2: Board 1 -->
+        <section class="step" data-step="2" aria-labelledby="s2-title">
+          <div class="step-head">
+            <h2 id="s2-title">Board 1 Konfigurieren</h2>
+            <div class="step-tools">
+              <button class="chip" id="b1-collapse">Alle einklappen</button>
+              <button class="chip" id="b1-expand">Alle ausklappen</button>
+            </div>
+          </div>
+          <div id="board-1" class="board"></div>
+        </section>
+
+        <!-- Schritt 3: Board 2 -->
+        <section class="step" data-step="3" aria-labelledby="s3-title">
+          <div class="step-head">
+            <h2 id="s3-title">Board 2 Konfigurieren</h2>
+            <div class="step-tools">
+              <button class="chip" id="b2-collapse">Alle einklappen</button>
+              <button class="chip" id="b2-expand">Alle ausklappen</button>
+            </div>
+          </div>
+          <div id="board-2" class="board"></div>
+        </section>
+
+        <!-- Schritt 4: Review -->
+        <section class="step" data-step="4" aria-labelledby="s4-title">
+          <h2 id="s4-title">Prüfen & Speichern</h2>
+          <div id="review" class="review"></div>
+        </section>
+
+        <!-- Sticky Footer-Navigation -->
+        <div class="wizard-nav">
+          <button class="btn-secondary" id="prevStep" type="button">Zurück</button>
+          <div class="spacer"></div>
+          <button class="btn-primary" id="nextStep" type="button">Weiter</button>
+          <button class="btn-primary hide" id="saveQuiz" type="button">Quiz speichern</button>
+        </div>
+      </section>
+    </div>
+  </main>
+
+  <footer class="site-footer">
+    <div class="container"><small>© <span id="year"></span> Quiz Abend</small></div>
+  </footer>
+
+  <script src="JS/create.js"></script>
+</body>
+</html>

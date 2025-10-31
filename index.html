@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Quiz Abend</title>
+  <link rel="stylesheet" href="CSS/index.css" />
+</head>
+<body>
+  <header class="site-header" role="banner">
+    <div class="container">
+      <h1 class="brand">Quiz Abend</h1>
+    </div>
+  </header>
+
+  <main class="site-main" id="main" tabindex="-1">
+    <div class="container">
+      <section aria-labelledby="start-actions" class="hero">
+        <h2 id="start-actions" class="visually-hidden">Aktionen</h2>
+
+        <div class="actions-grid">
+          <a href="create.html" class="action-btn" role="button" aria-label="Quiz erstellen">
+            <span class="icon" aria-hidden="true">📝</span>
+            <span class="label">Quiz erstellen</span>
+          </a>
+
+          <a href="join.html" class="action-btn" role="button" aria-label="Beitreten">
+            <span class="icon" aria-hidden="true">👥</span>
+            <span class="label">Beitreten</span>
+          </a>
+
+          <a href="host.html" class="action-btn" role="button" aria-label="Hosten">
+            <span class="icon" aria-hidden="true">🧠</span>
+            <span class="label">Hosten</span>
+          </a>
+        </div>
+      </section>
+    </div>
+  </main>
+
+  <footer class="site-footer" role="contentinfo">
+    <div class="container">
+      <small>© <span id="year"></span> Quiz Abend</small>
+    </div>
+  </footer>
+
+  <script src="JS/script.js"></script>
+</body>
+</html>
