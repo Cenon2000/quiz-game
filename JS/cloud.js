@@ -1,9 +1,7 @@
 // JS/cloud.js
 import { supabase } from "./supabaseClient.js";
 
-/* ============================
-   QUIZZES
-   ============================ */
+/* ========= QUIZZES ========= */
 
 async function saveQuizToCloud(quiz) {
   const payload = {
@@ -52,13 +50,10 @@ async function loadQuizById(id) {
     throw new Error("Quiz konnte nicht geladen werden.");
   }
 
-  // unser ursprüngliches Quiz steckt in data.data
   return data.data || data;
 }
 
-/* ============================
-   ROOMS
-   ============================ */
+/* ========= ROOMS (Kurzfassung) ========= */
 
 function generateRoomCode(length = 4) {
   const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
@@ -112,38 +107,25 @@ async function getRoom(code) {
   return data;
 }
 
-function makeId() {
-  try {
-    return crypto.randomUUID();
-  } catch {
-    return String(Date.now()) + "-" + Math.random().toString(16).slice(2);
-  }
-}
-
 async function joinRoom({ code, playerName, pin }) {
-  // 1) Raum laden
   const room = await getRoom(code);
 
-  // PIN prüfen
   if (room.pin && room.pin !== pin) {
     throw new Error("Falsche PIN.");
   }
 
   const players = Array.isArray(room.players) ? room.players.slice() : [];
 
-  // Name doppelt?
-  if (players.some((p) => p.name === playerName)) {
+  if (players.some(p => p.name === playerName)) {
     throw new Error("Name bereits im Raum.");
   }
 
-  // voll?
   if (players.length >= room.max_players) {
     throw new Error("Raum ist voll.");
   }
 
-  // neuen Spieler ergänzen
   players.push({
-    id: makeId(),
+    id: crypto.randomUUID ? crypto.randomUUID() : String(Date.now()),
     name: playerName,
     score: 0,
     joined_at: new Date().toISOString(),
@@ -180,9 +162,7 @@ async function updateRoomState(code, patch) {
   return data;
 }
 
-/* ============================
-   Realtime für Rooms (optional, aber praktisch)
-   ============================ */
+/* ========= Realtime (optional, minimal) ========= */
 
 function openRoomChannel(code, { onState, onPlayers } = {}) {
   const channel = supabase
@@ -217,22 +197,20 @@ function openRoomChannel(code, { onState, onPlayers } = {}) {
   };
 }
 
-/* ============================
-   Export
-   ============================ */
+/* ========= Export ========= */
 
 const Cloud = {
-  // quizzes
   saveQuizToCloud,
   listQuizzes,
   loadQuizById,
-  // rooms
   createRoom,
   getRoom,
   joinRoom,
   updateRoomState,
   openRoomChannel,
 };
+
+console.log("[Cloud] initialisiert", Cloud);
 
 export default Cloud;
 export {
