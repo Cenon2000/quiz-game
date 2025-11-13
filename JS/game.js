@@ -1,7 +1,12 @@
 // ===== Helpers =====
 const $   = id  => document.getElementById(id);
 const qsa = sel => [...document.querySelectorAll(sel)];
-const param = k => new URLSearchParams(location.search).get(k);
+const params = new URLSearchParams(location.search);
+const roomCode = params.get("code")?.toUpperCase() || null;
+const param = (name) => params.get(name);
+
+
+
 
 function triggerBodyFlash(kind /* 'correct' | 'wrong' */){
   const html = document.documentElement; // <html>
@@ -49,7 +54,9 @@ qsa(".host-only").forEach(el => el.classList.toggle("hidden", !isHost));
 qsa(".viewer-only").forEach(el => el.classList.toggle("hidden", isHost));
 document.body.classList.toggle("is-host", isHost);
 
+
 // ===== GLOBAL STATE (eine Quelle der Wahrheit) =====
+
 const STATE = (window.STATE ||= {
   quiz: null,
   boardIndex: 0,
@@ -61,6 +68,10 @@ const STATE = (window.STATE ||= {
   buzzMode: false,
   currentBuzzPlayer: null,
 });
+
+// === Realtime (Broadcast) ===
+let roomRT = null;   // wird später in init() mit Cloud.openRoomChannel(...) belegt
+
 
 // ===== Elements =====
 const gameTitle     = $("gameTitle");
@@ -83,18 +94,23 @@ const turnIndicator = $("turnIndicator");
 (async function init(){
   const quizId = param("quizId");
 
+  // 1) Versuch: aus Supabase über Cloud.loadQuizById laden
   try {
-    if (quizId){
-      const res = await fetch(`/api/quizzes?id=${encodeURIComponent(quizId)}`);
-      if (res.ok) STATE.quiz = await res.json();
+    if (quizId && window.Cloud && typeof Cloud.loadQuizById === "function") {
+      STATE.quiz = await Cloud.loadQuizById(quizId);
     }
-  } catch {}
+  } catch (err) {
+    console.error("Quiz Laden von Supabase fehlgeschlagen:", err);
+  }
 
+  // 2) Fallback: LocalStorage
   if (!STATE.quiz && quizId){
     try{
       const list = JSON.parse(localStorage.getItem("quiz:quizzes")||"[]");
       STATE.quiz = list.find(q=>q.id===quizId) || null;
-    }catch{}
+    }catch(err){
+      console.error("Fallback localStorage fehlgeschlagen:", err);
+    }
   }
 
   if (STATE.quiz){
@@ -119,6 +135,34 @@ const turnIndicator = $("turnIndicator");
   window.addEventListener("resize", applyMobileHeights);
   window.addEventListener("orientationchange", applyMobileHeights);
 })();
+
+
+// Realtime-Kanal öffnen (nur wenn Code + Funktion vorhanden)
+if (roomCode && window.Cloud && typeof Cloud.openRoomChannel === "function") {
+  roomRT = Cloud.openRoomChannel(roomCode, {
+    onState: (state) => {
+      if (!state) return;
+      STATE.boardIndex  = state.boardIndex ?? 0;
+      STATE.used        = new Set(state.used || []);
+      STATE.currentCell = state.currentCell || null;
+      renderBoard();
+      if (STATE.currentCell) {
+        showQuestion(STATE.currentCell);
+      } else {
+        showQuestion(null);
+      }
+    },
+    onPlayers: (arr) => {
+      if (!Array.isArray(arr)) return;
+      STATE.players = arr;
+      renderPlayers();
+      highlightCurrentPlayer();
+    }
+  });
+}
+
+
+
 
 
 // ===== Players UI =====
@@ -187,26 +231,49 @@ function renderBoard(){
 function usedKey(bi,ci,qi){ return `b${bi}-c${ci}-q${qi}`; }
 
 // ===== Question flow =====
-function onCellClick(catIdx, qIdx){
-  if (!isHost) return;
+function onCellClick(catIdx, qIdx) {
+  if (!isHost || !STATE.quiz) return;
 
   const b   = STATE.quiz.boards[STATE.boardIndex];
   const cat = b.categories[catIdx - 1];
-  const q   = cat.questions.find(x => x.index === qIdx);
+  const q   = cat?.questions.find(x => x.index === qIdx);
   if (!q) return;
 
   const key = usedKey(STATE.boardIndex, catIdx, qIdx);
-  if (STATE.used.has(key)) return; // bereits belegt → ignorieren
+  if (STATE.used.has(key)) return; // schon benutzt
 
-  // ⬇️ Sofort als benutzt markieren (wird direkt rot)
+  // 1) Sofort lokal markieren (UI: rot)
   STATE.used.add(key);
   const btn = boardGrid.querySelector(`.cell.q[data-cat="${catIdx}"][data-q="${qIdx}"]`);
   if (btn) btn.classList.add("used");
 
-  // Frage anzeigen
+  // 2) Frage anzeigen
   STATE.currentCell = { catIdx, qIdx, points: q.points, text: q.text, answer: q.answer };
   showQuestion(STATE.currentCell);
+
+  // 3) Broadcast an alle Clients (Supabase Realtime)
+  broadcastState();
 }
+
+
+
+
+  // ---- LIVE UPDATE: Frage ausgewählt ----
+if (isHost && roomRT) {
+  const state = {
+    boardIndex: STATE.boardIndex,
+    used: Array.from(STATE.used),
+    currentCell: STATE.currentCell
+  };
+
+  // Persistenz (für Reload)
+  Cloud.updateRoomState(roomCode, state).catch(console.error);
+
+  // Live an alle Geräte senden
+  roomRT.sendState(state);
+}
+
+
 
 
 function showQuestion(cell){
@@ -227,29 +294,55 @@ function showQuestion(cell){
 }
 
 // ===== Controls =====
+// ---- HELPER: an ALLE Geräte senden (State + Spieler) ----
+function broadcastState() {
+  if (!isHost || !roomRT) return;
+
+  const state = {
+    boardIndex: STATE.boardIndex,
+    used: Array.from(STATE.used),
+    currentCell: STATE.currentCell   // null, wenn Frage beendet
+  };
+
+  // Live an alle senden (sendState/ sendPlayers aktualisiert auch Supabase)
+  roomRT.sendState(state);
+  roomRT.sendPlayers(STATE.players);
+}
+
+
+// ===== Controls =====
 function wireControls(){
   btnCorrect.addEventListener("click", ()=>{
     if (!STATE.currentCell) return;
     flashScreen("correct");
 
-
+    // --- BUZZ-MODUS: richtiger Versuch eines anderen Spielers ---
     if (STATE.buzzMode && STATE.currentBuzzPlayer){
       const half = Math.floor(STATE.currentCell.points/2);
       STATE.currentBuzzPlayer.score += half;
       updateScore(STATE.currentBuzzPlayer);
-      endQuestionAndAdvance();
+
+      endQuestionAndAdvance();   // hier wird 'used' gesetzt
+      broadcastState();          // <- NACH dem Enden senden (enthält used=null/currentCell)
       return;
     }
 
+    // --- normaler aktiver Spieler ---
     const active = getActivePlayer();
-    if (active){ active.score += STATE.currentCell.points; updateScore(active); }
-    endQuestionAndAdvance();
+    if (active){
+      active.score += STATE.currentCell.points;
+      updateScore(active);
+    }
+
+    endQuestionAndAdvance();     // setzt used + currentCell=null
+    broadcastState();            // <- NACH dem Enden senden
   });
 
   btnWrong.addEventListener("click", ()=>{
     if (!STATE.currentCell) return;
     flashScreen("wrong");
 
+    // --- BUZZ-MODUS: falscher Versuch des buzzenden Spielers ---
     if (STATE.buzzMode && STATE.currentBuzzPlayer){
       const half = Math.floor(STATE.currentCell.points/2);
       STATE.currentBuzzPlayer.score -= half;
@@ -259,18 +352,42 @@ function wireControls(){
 
       if (buzzerBtns.children.length > 0){
         status("Nächster Buzz-Versuch …");
+        // Punkte haben sich geändert → nur Spielerstände senden
+        if (isHost && roomRT) roomRT.sendPlayers(STATE.players);
       } else {
+        // keiner mehr übrig → Frage beenden
         endQuestionAndAdvance();
+        broadcastState();        // <- NACH dem Enden senden
       }
       return;
     }
 
+    // --- normaler aktiver Spieler falsch → Buzz öffnen ---
     const active = getActivePlayer();
     const half = Math.floor(STATE.currentCell.points/2);
-    if (active){ active.score -= half; updateScore(active); }
-    openBuzzer();
+    if (active){
+      active.score -= half;
+      updateScore(active);
+      // Punkte geändert → Spielerstände senden
+      if (isHost && roomRT) roomRT.sendPlayers(STATE.players);
+    }
+
+        openBuzzer(); // Host öffnet Buzzer
+
+    // Der Zustand bleibt mit currentCell AKTIV (Frage läuft weiter)
+    if (isHost && roomRT){
+      const state = {
+        boardIndex: STATE.boardIndex,
+        used: Array.from(STATE.used),
+        currentCell: STATE.currentCell   // noch aktiv!
+      };
+      roomRT.sendState(state);
+      roomRT.sendPlayers(STATE.players);
+    }
   });
 }
+
+
 
 // ===== Mobile Drawer =====
 function wireMobileDrawer(){
@@ -390,6 +507,7 @@ function endQuestionAndAdvance(){
   checkNextBoard();
 }
 
+
 // ===== Board 1 → Board 2 =====
 function checkNextBoard(){
   if (!STATE.quiz || STATE.boardIndex !== 0) return;
@@ -449,3 +567,4 @@ function flashFeedback(type = "correct") {
   document.body.classList.add(cls);
   setTimeout(() => document.body.classList.remove(cls), 3000);
 }
+

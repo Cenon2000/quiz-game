@@ -44,6 +44,14 @@
     </div>
   </footer>
 
-  <script src="JS/script.js"></script>
+ <script type="module">
+  import { Cloud } from "./JS/cloud.js";  // <- benannter Export vorhanden
+  window.Cloud = Cloud;
+  console.log("Cloud loaded ✅", Object.keys(Cloud));
+</script>
+
+
+
+  <script src="/JS/script.js"></script>
 </body>
 </html>

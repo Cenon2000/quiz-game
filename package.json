@@ -1,0 +1,24 @@
+{
+  "name": "quiz-webseite",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Cenon2000/quiz-game.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/Cenon2000/quiz-game/issues"
+  },
+  "homepage": "https://github.com/Cenon2000/quiz-game#readme",
+  "devDependencies": {
+    "netlify-cli": "^23.9.5"
+  }
+}

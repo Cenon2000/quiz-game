@@ -1,0 +1,20 @@
+# Node
+node_modules/
+npm-debug.log
+yarn-error.log
+
+# Netlify build cache
+.netlify/
+
+# System
+.DS_Store
+Thumbs.db
+
+# VSCode
+.vscode/
+
+# Env files (falls du später Supabase Keys nutzt)
+.env
+.env.local
+.env.*.local
+

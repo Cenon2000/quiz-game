@@ -173,18 +173,36 @@ function collectBoard(boardNo){
 function validateBoard(b){
   let ok = true;
   const issues = [];
-  if (!b.categories.length) { ok = false; issues.push("Keine Kategorien."); }
+
+  if (!b.categories.length) {
+    ok = false;
+    issues.push("Keine Kategorien.");
+  }
+
   b.categories.forEach(c => {
-    if (!c.name) { ok = false; issues.push(`Board ${b.board}, Kategorie #${c.index}: Name fehlt.`); }
-    if (!c.questions.length) { ok = false; issues.push(`Board ${b.board}, Kategorie "${c.name||'#'+c.index}": Keine Fragen.`); }
+    if (!c.name) {
+      ok = false;
+      issues.push(`Board ${b.board}, Kategorie #${c.index}: Name fehlt.`);
+    }
+
+    if (!c.questions.length) {
+      ok = false;
+      issues.push(`Board ${b.board}, Kategorie "${c.name || '#' + c.index}": Keine Fragen.`);
+    }
+
     c.questions.forEach(q => {
       if (!q.text || !q.answer) {
-        ok = false; issues.push(`Board ${b.board}, Kategorie "${c.name||'#'+c.index}", Frage ${q.index}: Text/Antwort fehlt.`);
+        ok = false;
+        issues.push(
+          `Board ${b.board}, Kategorie "${c.name || '#' + c.index}", Frage ${q.index}: Text/Antwort fehlt.`
+        );
       }
     });
   });
+
   return { ok, issues };
 }
+
 
 function buildReview(){
   const board1 = collectBoard(1);
@@ -218,7 +236,18 @@ function renderIssues(list){
   if (!list.length) return `<p style="color:#059669;font-weight:700;">Keine Probleme gefunden ✓</p>`;
   return `<ul>${list.map(i=>`<li style="color:#b91c1c">${escapeHtml(i)}</li>`).join("")}</ul>`;
 }
-function escapeHtml(s){ return s.replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[c])); }
+function escapeHtml(s){
+  const map = {
+    "&": "&amp;",
+    "<": "&lt;",
+    ">": "&gt;",
+    '"': "&quot;",
+    "'": "&#039;"
+  };
+  return String(s || "")
+    .replace(/[&<>"']/g, c => map[c]);
+}
+
 
 /* ========= Autosave (Entwurf lokal) ========= */
 const DRAFT_KEY = "quiz:draft:create";
@@ -263,15 +292,15 @@ function throttle(fn, wait){
 }
 
 /* ========= Cloud speichern ========= */
-async function saveToCloud(quiz){
-  const headers = { "Content-Type": "application/json" };
-  // Falls du ADMIN_SECRET nutzt:
-  // headers["X-Admin-Secret"] = "DEIN_GEHEIMNIS";
-  const res = await fetch("/api/quizzes", { method: "POST", headers, body: JSON.stringify(quiz) });
-  if (!res.ok) throw new Error("Speichern fehlgeschlagen");
-  const data = await res.json();
-  return data.id;
+async function saveToCloud(quiz) {
+  if (!window.Cloud || !Cloud.saveQuizToCloud) {
+    throw new Error("Cloud API nicht verfügbar.");
+  }
+  const id = await Cloud.saveQuizToCloud(quiz);
+  return id;
 }
+
+
 
 saveBtn?.addEventListener("click", async ()=>{
   const quiz = buildQuizPayload();

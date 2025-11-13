@@ -1,0 +1,61 @@
+[build]
+  publish = "."
+  functions = "netlify/functions"
+
+[functions]
+  node_bundler = "esbuild"
+  external_node_modules = ["node-fetch"]
+
+# --- Quizzes ---
+# POST /api/quizzes  -> save-quiz function
+[[redirects]]
+  from = "/api/quizzes"
+  to = "/.netlify/functions/save-quiz"
+  status = 200
+  force = true
+  methods = ["POST", "OPTIONS"]
+
+# GET /api/list-quizzes -> list-quizzes function
+[[redirects]]
+  from = "/api/list-quizzes"
+  to = "/.netlify/functions/list-quizzes"
+  status = 200
+  force = true
+  methods = ["GET", "OPTIONS"]
+
+# GET /api/quizzes/:id -> get-quiz function
+[[redirects]]
+  from = "/api/quizzes/:id"
+  to = "/.netlify/functions/get-quiz"
+  status = 200
+  force = true
+  methods = ["GET", "OPTIONS"]
+
+# --- Rooms (optional, für Live-Spiel) ---
+[[redirects]]
+  from = "/api/rooms"
+  to = "/.netlify/functions/create-room"
+  status = 200
+  force = true
+  methods = ["POST", "OPTIONS"]
+
+[[redirects]]
+  from = "/api/rooms/:code"
+  to = "/.netlify/functions/get-room"
+  status = 200
+  force = true
+  methods = ["GET", "OPTIONS"]
+
+[[redirects]]
+  from = "/api/rooms/:code/join"
+  to = "/.netlify/functions/join-room"
+  status = 200
+  force = true
+  methods = ["POST", "OPTIONS"]
+
+[[redirects]]
+  from = "/api/rooms/:code"
+  to = "/.netlify/functions/update-room"
+  status = 200
+  force = true
+  methods = ["PATCH", "OPTIONS"]
