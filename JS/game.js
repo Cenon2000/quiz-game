@@ -197,14 +197,14 @@ const turnIndicator = $("turnIndicator");
     }
   }
 
-  // aktuellen Buzz-Spieler aus ID
+  // aktuellen Buzz-Spieler aus ID ermitteln
   if (Array.isArray(STATE.players) && state.currentBuzzPlayerId) {
     STATE.currentBuzzPlayer = STATE.players.find(p => p.id === state.currentBuzzPlayerId) || null;
   } else {
     STATE.currentBuzzPlayer = null;
   }
 
-  // Board / Frage
+  // Board & Frage aktualisieren
   renderBoard();
   if (STATE.currentCell) {
     showQuestion(STATE.currentCell);
@@ -212,18 +212,18 @@ const turnIndicator = $("turnIndicator");
     showQuestion(null);
   }
 
-  // Spieler-UI
+  // Spieler-UI aktualisieren
   renderPlayers();
   highlightCurrentPlayer();
 
-  // Buzzer-Bar abhängig vom Modus
+  // 🚨 HIER: Buzzer öffnen/schließen – bei ALLEN
   if (STATE.buzzMode && !prevBuzzMode) {
     openBuzzer();
   } else if (!STATE.buzzMode && prevBuzzMode) {
     closeBuzzer();
   }
 
-  // Rand-Flash überall
+  // Rand-Flash synchronisieren
   if (typeof state.flashSeq === "number" &&
       state.flashSeq > lastFlashSeqSeen &&
       state.flashType) {
@@ -231,6 +231,7 @@ const turnIndicator = $("turnIndicator");
     flashScreen(state.flashType === "correct" ? "correct" : "wrong");
   }
 },
+
 
 
     onPlayers: (arr) => {
@@ -363,7 +364,6 @@ function showQuestion(cell){
 function broadcastState(flashType) {
   if (!isHost || !roomRT) return;
 
-  // Zähler für „Blinken“-Events erhöhen, wenn ein Flash gewünscht ist
   if (flashType) {
     STATE.flashSeq = (STATE.flashSeq || 0) + 1;
   }
@@ -384,6 +384,7 @@ function broadcastState(flashType) {
   roomRT.sendState(state);
   roomRT.sendPlayers(STATE.players);
 }
+
 
 
 
@@ -417,46 +418,37 @@ function wireControls(){
   });
 
   btnWrong.addEventListener("click", ()=>{
-    if (!STATE.currentCell) return;
-    flashScreen("wrong");
+  if (!STATE.currentCell) return;
+  flashScreen("wrong");
 
-    // --- BUZZ-MODUS: falscher Versuch des buzzenden Spielers ---
-    if (STATE.buzzMode && STATE.currentBuzzPlayer){
-      const half = Math.floor(STATE.currentCell.points/2);
-      STATE.currentBuzzPlayer.score -= half;
-      updateScore(STATE.currentBuzzPlayer);
-      removeBuzzButtonFor(STATE.currentBuzzPlayer);
-      setCurrentBuzzPlayer(null);
-
-      if (buzzerBtns.children.length > 0){
-        status("Nächster Buzz-Versuch …");
-        // Punkte haben sich geändert → nur Spielerstände senden
-        if (isHost && roomRT) roomRT.sendPlayers(STATE.players);
-      } else {
-        // keiner mehr übrig → Frage beenden
-        endQuestionAndAdvance();
-        broadcastState("wrong");        // <- NACH dem Enden senden
-      }
-      return;
-    }
-
-    // --- normaler aktiver Spieler falsch → Buzz öffnen ---
-    const active = getActivePlayer();
-    const half = Math.floor(STATE.currentCell.points/2);
-    if (active){
-      active.score -= half;
-      updateScore(active);
-      // Punkte geändert → Spielerstände senden
+  // --- BUZZ-MODUS: falscher Versuch des buzzenden Spielers ---
+  if (STATE.buzzMode && STATE.currentBuzzPlayer){
+    
+    if (buzzerBtns.children.length > 0){
+      status("Nächster Buzz-Versuch …");
       if (isHost && roomRT) roomRT.sendPlayers(STATE.players);
+    } else {
+      endQuestionAndAdvance();
+      broadcastState("wrong");
     }
+    return;
+  }
 
-          openBuzzer(); // Host öffnet Buzzer (setzt STATE.buzzMode = true)
+  // --- normaler aktiver Spieler falsch → Buzz öffnen ---
+  const active = getActivePlayer();
+  const half = Math.floor(STATE.currentCell.points/2);
+  if (active){
+    active.score -= half;
+    updateScore(active);
+    if (isHost && roomRT) roomRT.sendPlayers(STATE.players);
+  }
 
-  // Der Zustand bleibt mit currentCell AKTIV (Frage läuft weiter)
-  // -> Buzzer-Mode + roter Flash sollen bei allen sichtbar sein
+  // Host öffnet den Buzzer lokal…
+  openBuzzer();
+  // …und synchronisiert den Zustand (inkl. buzzMode & Flash) an alle
   broadcastState("wrong");
+});
 
-  });
 }
 
 
@@ -505,24 +497,39 @@ function openBuzzer(){
   STATE.buzzMode = true;
 
   if (!candidates.length){
-    endQuestionAndAdvance();
+    // Nur Host darf in diesem Fall automatisch beenden
+    if (isHost){
+      endQuestionAndAdvance();
+      broadcastState("wrong");
+    }
     return;
   }
 
-  candidates.forEach(p=>{
-    const b = document.createElement("button");
-    b.type = "button";
-    b.className = "btn";
-    b.textContent = `→ ${p.name}`;
-    b.addEventListener("click", ()=> selectBuzzPlayer(p));
-    buzzerBtns.appendChild(b);
-  });
+  if (isHost){
+    // Host: Buttons, um Buzz-Spieler zu wählen
+    candidates.forEach(p=>{
+      const b = document.createElement("button");
+      b.type = "button";
+      b.className = "btn";
+      b.textContent = `→ ${p.name}`;
+      b.addEventListener("click", ()=> selectBuzzPlayer(p));
+      buzzerBtns.appendChild(b);
+    });
+    status("Buzzer offen: wähle, wer versucht zu antworten.");
+  } else {
+    // Spieler: nur Hinweis im Buzzer-Bereich
+    const info = document.createElement("div");
+    info.className = "buzzer-info";
+    info.textContent = "Buzzer ist offen – der Host wählt, wer antwortet.";
+    buzzerBtns.appendChild(info);
+    status("Buzzer offen – warte auf den Host.");
+  }
 
   buzzerBar.classList.remove("hidden");
-  status("Buzzer offen: wähle, wer versucht zu antworten.");
   showBuzzHint(null);
   updateMobileIndicator();
 }
+
 
 function selectBuzzPlayer(p){
   setCurrentBuzzPlayer(p);
