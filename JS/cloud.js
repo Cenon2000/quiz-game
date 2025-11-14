@@ -183,6 +183,36 @@ async function updateRoomState(code, patch) {
   return data;
 }
 
+async function buzzIn(code, playerId) {
+  // Spieler will buzzern → wir hängen seine ID an die buzzQueue in room.state
+  const room = await getRoom(code);
+  const state = room.state || {};
+
+  const queue = Array.isArray(state.buzzQueue) ? state.buzzQueue.slice() : [];
+
+  // Nicht doppelt in die Warteschlange aufnehmen
+  if (!queue.includes(playerId)) {
+    queue.push(playerId);
+  }
+
+  state.buzzQueue = queue;
+
+  const { data, error } = await supabase
+    .from("rooms")
+    .update({ state })
+    .eq("code", code)
+    .select("*")
+    .single();
+
+  if (error) {
+    console.error("buzzIn error:", error);
+    throw new Error("Buzz konnte nicht gesendet werden.");
+  }
+
+  return data;
+}
+
+
 /* ========= Realtime (optional, minimal) ========= */
 
 // Realtime für einen Raum-Code
@@ -246,6 +276,7 @@ const Cloud = {
   joinRoom,
   updateRoomState,
   openRoomChannel,
+  buzzIn,
 };
 
 console.log("[Cloud] initialisiert", Cloud);
@@ -260,4 +291,5 @@ export {
   joinRoom,
   updateRoomState,
   openRoomChannel,
+  buzzIn,
 };

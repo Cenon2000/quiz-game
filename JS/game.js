@@ -5,16 +5,11 @@ const params   = new URLSearchParams(location.search);
 const roomCode = params.get("code")?.toUpperCase() || null;
 const param = (name) => params.get(name);
 
-
-
-
 function triggerBodyFlash(kind /* 'correct' | 'wrong' */){
   const html = document.documentElement; // <html>
   html.classList.remove('flash-correct','flash-wrong');
-  // Reflow erzwingen, damit die Animation jedes Mal neu startet
   void html.offsetWidth;
   html.classList.add(kind === 'correct' ? 'flash-correct' : 'flash-wrong');
-  // nach 2s wieder sauber entfernen
   setTimeout(() => {
     html.classList.remove('flash-correct','flash-wrong');
   }, 2000);
@@ -34,39 +29,25 @@ function ensureFlashOverlay(){
 // Effekt auslösen (type: "correct" | "wrong")
 function flashScreen(type){
   const el = ensureFlashOverlay();
-  // laufende Animation zurücksetzen
   el.className = '';
-  // Reflow erzwingen, damit die Klasse neu startet
   void el.offsetWidth;
   el.classList.add(type === 'correct' ? 'flash-correct' : 'flash-wrong');
-  // Nach 2.1s aufräumen (etwas > Animationsdauer)
   setTimeout(() => { el.className = ''; }, 2100);
 }
-
-
-
 
 $("year") && ($("year").textContent = new Date().getFullYear());
 
 // ===== Role visibility =====
-// Host, wenn:
-// - URL: ?role=host  (alt, für Tests)
-// - ODER URL: ?host=1 (neu, von host.html-Redirect)
-// - ODER localStorage-Flag gesetzt ist
 const isHost =
   (param("role") || "").toLowerCase() === "host" ||
   param("host") === "1" ||
   sessionStorage.getItem("quiz:isHost") === "1";
 
-
 qsa(".host-only").forEach(el => el.classList.toggle("hidden", !isHost));
 qsa(".viewer-only").forEach(el => el.classList.toggle("hidden", isHost));
 document.body.classList.toggle("is-host", isHost);
 
-
-
 // ===== GLOBAL STATE (eine Quelle der Wahrheit) =====
-
 const STATE = (window.STATE ||= {
   quiz: null,
   boardIndex: 0,
@@ -77,12 +58,13 @@ const STATE = (window.STATE ||= {
   hostName: sessionStorage.getItem("quiz:playerName") || "Host",
   buzzMode: false,
   currentBuzzPlayer: null,
+  buzzQueue: [],           // Array von Player-IDs in Buzz-Reihenfolge
   flashSeq: 0,             // Zähler für visuelle Effekte (Rand-Flash)
 });
 
 // === Realtime (Broadcast) ===
-let roomRT = null;   // wird später in init() mit Cloud.openRoomChannel(...) belegt
-let lastFlashSeqSeen = 0;  // für Clients, um neue Flash-Events zu erkennen
+let roomRT = null;
+let lastFlashSeqSeen = 0;
 
 // ===== Elements =====
 const gameTitle     = $("gameTitle");
@@ -100,32 +82,32 @@ const buzzerBtns    = $("buzzerBtns");
 const sidebar       = $("sidebar");
 const drawerScrim   = $("drawerScrim");
 const turnIndicator = $("turnIndicator");
+// Button für Spieler-Buzz wird dynamisch erzeugt:
+let viewerBuzzBtn = $("viewerBuzzBtn");
 
 // ===== Init =====
 (async function init(){
   let quizId = param("quizId"); // Fallback für alte Links
 
-  // 1) Wenn wir einen Room-Code haben: Room + State + Players aus Supabase laden
+  // 1) Room + State + Players aus Supabase laden
   if (roomCode && window.Cloud && typeof Cloud.getRoom === "function") {
     try {
       const room = await Cloud.getRoom(roomCode);
 
-      // Host-Name aus Room übernehmen (falls vorhanden)
       if (room.host_name) {
         STATE.hostName = room.host_name;
       }
 
-      // Quiz-ID aus Room-State oder Spalte quiz_id holen
       quizId = room.state?.quizId || room.quiz_id || quizId;
 
-      // initialen State übernehmen
       if (room.state) {
         STATE.boardIndex  = room.state.boardIndex ?? 0;
         STATE.used        = new Set(room.state.used || []);
         STATE.currentCell = room.state.currentCell || null;
+        STATE.buzzMode    = !!room.state.buzzMode;
+        STATE.buzzQueue   = Array.isArray(room.state.buzzQueue) ? room.state.buzzQueue : [];
       }
 
-      // Spieler aus Room übernehmen
       if (Array.isArray(room.players)) {
         STATE.players = room.players;
       }
@@ -143,7 +125,7 @@ const turnIndicator = $("turnIndicator");
     console.error("Quiz Laden von Supabase fehlgeschlagen:", err);
   }
 
-  // 3) (Optional) Fallback: LocalStorage, falls du das weiter behalten willst
+  // 3) Fallback: localStorage
   if (!STATE.quiz && quizId) {
     try {
       const list = JSON.parse(localStorage.getItem("quiz:quizzes") || "[]");
@@ -161,7 +143,7 @@ const turnIndicator = $("turnIndicator");
     gameTitle.textContent = "Quiz";
   }
 
-  // 5) UI & Controls verdrahten (immer)
+  // 5) UI & Controls verdrahten
   hostNameBox.textContent = STATE.hostName;
   renderPlayers();
   highlightCurrentPlayer();
@@ -170,85 +152,104 @@ const turnIndicator = $("turnIndicator");
   applyMobileHeights();
   updateMobileIndicator();
 
-  // Board nur rendern, wenn Quiz existiert
+  // BUZZ!-Button für Viewer dynamisch hinzufügen
+  if (!isHost && buzzerBar) {
+    const hint = buzzerBar.querySelector(".buzzer-hint");
+    if (hint && !viewerBuzzBtn) {
+      const btn = document.createElement("button");
+      btn.id = "viewerBuzzBtn";
+      btn.className = "btn";
+      btn.textContent = "BUZZ!";
+      hint.insertBefore(btn, hint.firstChild);
+      viewerBuzzBtn = btn;
+    }
+  }
+  if (viewerBuzzBtn) {
+    viewerBuzzBtn.addEventListener("click", onLocalBuzz);
+    viewerBuzzBtn.disabled = true;
+  }
+
   if (STATE.quiz) renderBoard();
 
   window.addEventListener("resize", applyMobileHeights);
   window.addEventListener("orientationchange", applyMobileHeights);
 
-  // 6) Realtime-Kanal öffnen (nachdem wir initialen State geladen haben)
+  // 6) Realtime-Kanal öffnen
   if (roomCode && window.Cloud && typeof Cloud.openRoomChannel === "function") {
-  roomRT = Cloud.openRoomChannel(roomCode, {
-    onState: (state) => {
-  if (!state) return;
+    roomRT = Cloud.openRoomChannel(roomCode, {
+      onState: (state) => {
+        if (!state) return;
 
-  const prevBuzzMode = STATE.buzzMode;
+        const prevBuzzMode = STATE.buzzMode;
 
-  STATE.boardIndex  = state.boardIndex ?? 0;
-  STATE.used        = new Set(state.used || []);
-  STATE.currentCell = state.currentCell || null;
-  STATE.buzzMode    = !!state.buzzMode;
+        STATE.boardIndex  = state.boardIndex ?? 0;
+        STATE.used        = new Set(state.used || []);
+        STATE.currentCell = state.currentCell || null;
+        STATE.buzzMode    = !!state.buzzMode;
+        STATE.buzzQueue   = Array.isArray(state.buzzQueue) ? state.buzzQueue : [];
 
-  // aktuellen Spieler aus ID ermitteln
-  if (Array.isArray(STATE.players) && state.currentPlayerId) {
-    const idx = STATE.players.findIndex(p => p.id === state.currentPlayerId);
-    if (idx >= 0) {
-      STATE.currentPlayerIndex = idx;
-    }
+        // aktuellen Spieler (Turn) aus ID ermitteln
+        if (Array.isArray(STATE.players) && state.currentPlayerId) {
+          const idx = STATE.players.findIndex(p => p.id === state.currentPlayerId);
+          if (idx >= 0) {
+            STATE.currentPlayerIndex = idx;
+          }
+        }
+
+        // aktuellen Buzz-Spieler aus Queue ermitteln (erstes Element)
+        if (Array.isArray(STATE.players) && STATE.buzzQueue.length) {
+          const first = STATE.players.find(p => p.id === STATE.buzzQueue[0]);
+          STATE.currentBuzzPlayer = first || null;
+        } else {
+          STATE.currentBuzzPlayer = null;
+        }
+
+        // Board & Frage
+        renderBoard();
+        if (STATE.currentCell) {
+          showQuestion(STATE.currentCell);
+        } else {
+          showQuestion(null);
+        }
+
+        // Spieler-UI
+        renderPlayers();
+        highlightCurrentPlayer();
+
+        // Buzzer öffnen/schließen – bei ALLEN
+        if (STATE.buzzMode && !prevBuzzMode) {
+          openBuzzer();
+        } else if (!STATE.buzzMode && prevBuzzMode) {
+          closeBuzzer();
+        } else if (STATE.buzzMode) {
+          // Buzz-Modus weiterhin aktiv → Anzeige aktualisieren
+          showBuzzHint(STATE.currentBuzzPlayer);
+        }
+
+        // Viewer-BUZZ-Button aktivieren/deaktivieren
+        if (viewerBuzzBtn) {
+          viewerBuzzBtn.disabled = !localCanBuzz();
+        }
+
+        // Rand-Flash synchronisieren
+        if (typeof state.flashSeq === "number" &&
+            state.flashSeq > lastFlashSeqSeen &&
+            state.flashType) {
+          lastFlashSeqSeen = state.flashSeq;
+          flashScreen(state.flashType === "correct" ? "correct" : "wrong");
+        }
+      },
+
+      onPlayers: (arr) => {
+        if (!Array.isArray(arr)) return;
+        STATE.players = arr;
+        renderPlayers();
+        highlightCurrentPlayer();
+      }
+    });
   }
-
-  // aktuellen Buzz-Spieler aus ID ermitteln
-  if (Array.isArray(STATE.players) && state.currentBuzzPlayerId) {
-    STATE.currentBuzzPlayer = STATE.players.find(p => p.id === state.currentBuzzPlayerId) || null;
-  } else {
-    STATE.currentBuzzPlayer = null;
-  }
-
-  // Board & Frage aktualisieren
-  renderBoard();
-  if (STATE.currentCell) {
-    showQuestion(STATE.currentCell);
-  } else {
-    showQuestion(null);
-  }
-
-  // Spieler-UI aktualisieren
-  renderPlayers();
-  highlightCurrentPlayer();
-
-  // 🚨 HIER: Buzzer öffnen/schließen – bei ALLEN
-  if (STATE.buzzMode && !prevBuzzMode) {
-    openBuzzer();
-  } else if (!STATE.buzzMode && prevBuzzMode) {
-    closeBuzzer();
-  }
-
-  // Rand-Flash synchronisieren
-  if (typeof state.flashSeq === "number" &&
-      state.flashSeq > lastFlashSeqSeen &&
-      state.flashType) {
-    lastFlashSeqSeen = state.flashSeq;
-    flashScreen(state.flashType === "correct" ? "correct" : "wrong");
-  }
-},
-
-
-
-    onPlayers: (arr) => {
-      if (!Array.isArray(arr)) return;
-      STATE.players = arr;
-      renderPlayers();
-      highlightCurrentPlayer();
-    }
-  });
-}
 
 })();
-
-
-
-
-
 
 // ===== Players UI =====
 function renderPlayers(){
@@ -327,16 +328,17 @@ function onCellClick(catIdx, qIdx) {
   const key = usedKey(STATE.boardIndex, catIdx, qIdx);
   if (STATE.used.has(key)) return; // schon benutzt
 
-  // 1) Sofort lokal markieren (UI: rot)
   STATE.used.add(key);
   const btn = boardGrid.querySelector(`.cell.q[data-cat="${catIdx}"][data-q="${qIdx}"]`);
   if (btn) btn.classList.add("used");
 
-  // 2) Frage anzeigen
   STATE.currentCell = { catIdx, qIdx, points: q.points, text: q.text, answer: q.answer };
   showQuestion(STATE.currentCell);
 
-  // 3) Broadcast an alle Clients (Supabase Realtime)
+  // Wenn neue Frage gewählt wird: Buzz-Modus resetten
+  STATE.buzzMode = false;
+  STATE.buzzQueue = [];
+  STATE.currentBuzzPlayer = null;
   broadcastState();
 }
 
@@ -350,17 +352,18 @@ function showQuestion(cell){
     return;
   }
   qText.textContent = cell.text;
-  if (isHost){ qAnswer.textContent = cell.answer; qAnswerWrap.classList.remove("hidden"); }
-  else { qAnswerWrap.classList.add("hidden"); }
+  if (isHost){
+    qAnswer.textContent = cell.answer;
+    qAnswerWrap.classList.remove("hidden");
+  } else {
+    qAnswerWrap.classList.add("hidden");
+  }
   btnCorrect.disabled = false;
   btnWrong.disabled = false;
   closeBuzzer();
 }
 
-// ===== Controls =====
-// ---- HELPER: an ALLE Geräte senden (State + Spieler) ----
-
-
+// ===== State-Broadcast & Buzz-Helpers =====
 function broadcastState(flashType) {
   if (!isHost || !roomRT) return;
 
@@ -375,6 +378,7 @@ function broadcastState(flashType) {
     used: Array.from(STATE.used),
     currentCell: STATE.currentCell,   // null, wenn Frage beendet
     buzzMode: STATE.buzzMode,
+    buzzQueue: Array.isArray(STATE.buzzQueue) ? STATE.buzzQueue : [],
     currentPlayerId: currentPlayer ? currentPlayer.id : null,
     currentBuzzPlayerId: STATE.currentBuzzPlayer ? STATE.currentBuzzPlayer.id : null,
     flashSeq: STATE.flashSeq || 0,
@@ -385,9 +389,34 @@ function broadcastState(flashType) {
   roomRT.sendPlayers(STATE.players);
 }
 
+function getLocalPlayerId(){
+  return sessionStorage.getItem("quiz:playerId") || null;
+}
 
+function localCanBuzz(){
+  const pid = getLocalPlayerId();
+  if (!pid) return false;
+  if (!STATE.buzzMode) return false;
+  const active = getActivePlayer();
+  if (active && active.id === pid) return false; // der aktive Spieler darf nicht buzzern
+  const q = Array.isArray(STATE.buzzQueue) ? STATE.buzzQueue : [];
+  return !q.includes(pid); // noch nicht in der Warteschlange
+}
 
+// Spieler-BUZZ-Klick
+async function onLocalBuzz(){
+  const pid = getLocalPlayerId();
+  if (!pid || !roomCode) return;
+  if (!localCanBuzz()) return;
+  if (!window.Cloud || typeof Cloud.buzzIn !== "function") return;
 
+  try {
+    if (viewerBuzzBtn) viewerBuzzBtn.disabled = true;
+    await Cloud.buzzIn(roomCode, pid);
+  } catch (e) {
+    console.error("Buzz senden fehlgeschlagen:", e);
+  }
+}
 
 // ===== Controls =====
 function wireControls(){
@@ -395,14 +424,19 @@ function wireControls(){
     if (!STATE.currentCell) return;
     flashScreen("correct");
 
-    // --- BUZZ-MODUS: richtiger Versuch eines anderen Spielers ---
+    // --- BUZZ-MODUS: richtiger Versuch eines Buzzers ---
     if (STATE.buzzMode && STATE.currentBuzzPlayer){
       const half = Math.floor(STATE.currentCell.points/2);
       STATE.currentBuzzPlayer.score += half;
       updateScore(STATE.currentBuzzPlayer);
 
-      endQuestionAndAdvance();   // hier wird 'used' gesetzt
-      broadcastState("correct");          // <- NACH dem Enden senden (enthält used=null/currentCell)
+      // Frage beenden, Buzz-Modus aus
+      STATE.buzzMode = false;
+      STATE.buzzQueue = [];
+      STATE.currentBuzzPlayer = null;
+
+      endQuestionAndAdvance();
+      broadcastState("correct");
       return;
     }
 
@@ -413,45 +447,61 @@ function wireControls(){
       updateScore(active);
     }
 
-    endQuestionAndAdvance();     // setzt used + currentCell=null
-    broadcastState("correct");            // <- NACH dem Enden senden
+    STATE.buzzMode = false;
+    STATE.buzzQueue = [];
+    STATE.currentBuzzPlayer = null;
+
+    endQuestionAndAdvance();
+    broadcastState("correct");
   });
 
   btnWrong.addEventListener("click", ()=>{
-  if (!STATE.currentCell) return;
-  flashScreen("wrong");
+    if (!STATE.currentCell) return;
+    flashScreen("wrong");
 
-  // --- BUZZ-MODUS: falscher Versuch des buzzenden Spielers ---
-  if (STATE.buzzMode && STATE.currentBuzzPlayer){
-    
-    if (buzzerBtns.children.length > 0){
-      status("Nächster Buzz-Versuch …");
-      if (isHost && roomRT) roomRT.sendPlayers(STATE.players);
-    } else {
-      endQuestionAndAdvance();
-      broadcastState("wrong");
+    // --- BUZZ-MODUS: falscher Versuch des buzzenden Spielers ---
+    if (STATE.buzzMode && STATE.currentBuzzPlayer){
+      const half = Math.floor(STATE.currentCell.points/2);
+      STATE.currentBuzzPlayer.score -= half;
+      updateScore(STATE.currentBuzzPlayer);
+
+      const pid = STATE.currentBuzzPlayer.id;
+      const q = Array.isArray(STATE.buzzQueue) ? STATE.buzzQueue : [];
+      STATE.buzzQueue = q.filter(id => id !== pid);
+
+      if (STATE.buzzQueue.length > 0){
+        const next = STATE.players.find(p => p.id === STATE.buzzQueue[0]);
+        STATE.currentBuzzPlayer = next || null;
+        status("Nächster Buzz-Versuch …");
+        broadcastState("wrong");
+      } else {
+        // keiner mehr übrig → Frage beenden
+        STATE.currentBuzzPlayer = null;
+        STATE.buzzMode = false;
+        endQuestionAndAdvance();
+        broadcastState("wrong");
+      }
+      return;
     }
-    return;
-  }
 
-  // --- normaler aktiver Spieler falsch → Buzz öffnen ---
-  const active = getActivePlayer();
-  const half = Math.floor(STATE.currentCell.points/2);
-  if (active){
-    active.score -= half;
-    updateScore(active);
-    if (isHost && roomRT) roomRT.sendPlayers(STATE.players);
-  }
+    // --- normaler aktiver Spieler falsch → Buzz öffnen ---
+    const active = getActivePlayer();
+    const half = Math.floor(STATE.currentCell.points/2);
+    if (active){
+      active.score -= half;
+      updateScore(active);
+      if (isHost && roomRT) roomRT.sendPlayers(STATE.players);
+    }
 
-  // Host öffnet den Buzzer lokal…
-  openBuzzer();
-  // …und synchronisiert den Zustand (inkl. buzzMode & Flash) an alle
-  broadcastState("wrong");
-});
+    // Buzzer-Phase starten: andere Spieler dürfen buzzern
+    STATE.buzzMode = true;
+    STATE.buzzQueue = [];
+    STATE.currentBuzzPlayer = null;
 
+    openBuzzer();
+    broadcastState("wrong");
+  });
 }
-
-
 
 // ===== Mobile Drawer =====
 function wireMobileDrawer(){
@@ -480,60 +530,34 @@ function wireMobileDrawer(){
     if (!show) closeDrawer();
   };
 
-  // Events
   turnIndicator.addEventListener("click", toggleDrawer);
   drawerScrim.addEventListener("click", closeDrawer);
   window.addEventListener("resize", applyVisibility);
 
-  // Initial
   applyVisibility();
 }
 
 // ===== Buzzer =====
 function openBuzzer(){
-  const candidates = STATE.players.filter((_, idx) => idx !== STATE.currentPlayerIndex);
-  buzzerBtns.innerHTML = "";
-  STATE.currentBuzzPlayer = null;
   STATE.buzzMode = true;
 
-  if (!candidates.length){
-    // Nur Host darf in diesem Fall automatisch beenden
-    if (isHost){
-      endQuestionAndAdvance();
-      broadcastState("wrong");
-    }
-    return;
-  }
-
-  if (isHost){
-    // Host: Buttons, um Buzz-Spieler zu wählen
-    candidates.forEach(p=>{
-      const b = document.createElement("button");
-      b.type = "button";
-      b.className = "btn";
-      b.textContent = `→ ${p.name}`;
-      b.addEventListener("click", ()=> selectBuzzPlayer(p));
-      buzzerBtns.appendChild(b);
-    });
-    status("Buzzer offen: wähle, wer versucht zu antworten.");
-  } else {
-    // Spieler: nur Hinweis im Buzzer-Bereich
-    const info = document.createElement("div");
-    info.className = "buzzer-info";
-    info.textContent = "Buzzer ist offen – der Host wählt, wer antwortet.";
-    buzzerBtns.appendChild(info);
-    status("Buzzer offen – warte auf den Host.");
-  }
-
   buzzerBar.classList.remove("hidden");
-  showBuzzHint(null);
+  showBuzzHint(STATE.currentBuzzPlayer);
   updateMobileIndicator();
-}
 
+  if (isHost) {
+    if (STATE.currentBuzzPlayer) {
+      status(`Buzz: ${STATE.currentBuzzPlayer.name} ist dran.`);
+    } else {
+      status("Buzzer offen – andere Spieler können buzzern.");
+    }
+  } else {
+    status("Buzzer offen – drücke BUZZ!, wenn du die Antwort weißt.");
+  }
 
-function selectBuzzPlayer(p){
-  setCurrentBuzzPlayer(p);
-  status(`Buzz-Versuch: ${p.name} – mit Richtig/Falsch bewerten.`);
+  if (viewerBuzzBtn) {
+    viewerBuzzBtn.disabled = !localCanBuzz();
+  }
 }
 
 function setCurrentBuzzPlayer(p){
@@ -556,17 +580,13 @@ function showBuzzHint(p){
   qText.textContent = `${STATE.currentCell?.text || ""} — (Buzz: ${p.name})`;
 }
 
-function removeBuzzButtonFor(p){
-  const btns = [...buzzerBtns.querySelectorAll("button")];
-  const btn = btns.find(b => b.textContent.endsWith(p.name));
-  if (btn) btn.remove();
-}
-
 function closeBuzzer(){
   buzzerBar.classList.add("hidden");
   buzzerBtns.innerHTML = "";
   setCurrentBuzzPlayer(null);
   STATE.buzzMode = false;
+  STATE.buzzQueue = [];
+  if (viewerBuzzBtn) viewerBuzzBtn.disabled = true;
   updateMobileIndicator();
 }
 
@@ -582,10 +602,9 @@ function endQuestionAndAdvance(){
   closeBuzzer();
   status("Frage abgeschlossen.");
 
-  if (STATE.players.length) advanceTurn(); // Buzz-Gewinne ändern Reihenfolge NICHT
+  if (STATE.players.length) advanceTurn();
   checkNextBoard();
 }
-
 
 // ===== Board 1 → Board 2 =====
 function checkNextBoard(){
@@ -614,13 +633,12 @@ function updateMobileIndicator(){
 }
 
 function applyMobileHeights(){
-  // Höhe der unteren Controls → CSS-Var, damit Drawer & Trigger korrekt sitzen
   const controls = document.querySelector(".answer-actions");
   const h = controls ? controls.offsetHeight : 64;
   document.documentElement.style.setProperty("--controls-h", h + "px");
 }
 
-// ===== Test-Helfer für die Konsole (stabil, ohne Scope-Probleme) =====
+// ===== Test-Helfer =====
 function setQuizForTest(q){
   STATE.quiz = q;
   STATE.boardIndex = 0;
@@ -646,4 +664,3 @@ function flashFeedback(type = "correct") {
   document.body.classList.add(cls);
   setTimeout(() => document.body.classList.remove(cls), 3000);
 }
-

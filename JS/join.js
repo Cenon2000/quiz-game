@@ -57,18 +57,21 @@ form.addEventListener("submit", async (e) => {
     // Den tatsächlich verwendeten Namen ermitteln (falls (2), (3) angehängt wurden)
     const normalize = s => (s || "").trim().toLowerCase();
     let effectiveName = nick;
+    let myPlayerId = null;
     if (Array.isArray(room.players) && room.players.length) {
       const exact = room.players.find(p => normalize(p.name) === normalize(nick));
       effectiveName = exact?.name || room.players[room.players.length - 1].name || nick;
+      myPlayerId = chosen?.id || null;
     }
 
-    // Session-Daten für game.js speichern
     sessionStorage.setItem("quiz:roomCode", code);
-    sessionStorage.setItem("quiz:playerName", effectiveName);
-    sessionStorage.removeItem("quiz:isHost"); // Sicherheit: Joiner ist nie Host
+  sessionStorage.setItem("quiz:playerName", effectiveName);
+  if (myPlayerId) {
+    sessionStorage.setItem("quiz:playerId", myPlayerId);
+  }
+  sessionStorage.removeItem("quiz:isHost");
 
-    // Ab ins Spielfeld
-    window.location.href = `game.html?code=${encodeURIComponent(code)}`;
+  window.location.href = `game.html?code=${encodeURIComponent(code)}`;
   } catch (err) {
     console.error("Join error:", err);
     alert(err.message || "Beitritt zum Raum fehlgeschlagen.");
