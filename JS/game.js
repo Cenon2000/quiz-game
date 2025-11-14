@@ -178,67 +178,65 @@ let viewerBuzzBtn = $("viewerBuzzBtn");
   if (roomCode && window.Cloud && typeof Cloud.openRoomChannel === "function") {
     roomRT = Cloud.openRoomChannel(roomCode, {
       onState: (state) => {
-        if (!state) return;
+  if (!state) return;
 
-        const prevBuzzMode = STATE.buzzMode;
+  STATE.boardIndex  = state.boardIndex ?? 0;
+  STATE.used        = new Set(state.used || []);
+  STATE.currentCell = state.currentCell || null;
+  STATE.buzzMode    = !!state.buzzMode;
+  STATE.buzzQueue   = Array.isArray(state.buzzQueue) ? state.buzzQueue : [];
 
-        STATE.boardIndex  = state.boardIndex ?? 0;
-        STATE.used        = new Set(state.used || []);
-        STATE.currentCell = state.currentCell || null;
-        STATE.buzzMode    = !!state.buzzMode;
-        STATE.buzzQueue   = Array.isArray(state.buzzQueue) ? state.buzzQueue : [];
+  // aktuellen Spieler (Turn) aus ID ermitteln
+  if (Array.isArray(STATE.players) && state.currentPlayerId) {
+    const idx = STATE.players.findIndex(p => p.id === state.currentPlayerId);
+    if (idx >= 0) {
+      STATE.currentPlayerIndex = idx;
+    }
+  }
 
-        // aktuellen Spieler (Turn) aus ID ermitteln
-        if (Array.isArray(STATE.players) && state.currentPlayerId) {
-          const idx = STATE.players.findIndex(p => p.id === state.currentPlayerId);
-          if (idx >= 0) {
-            STATE.currentPlayerIndex = idx;
-          }
-        }
+  // aktuellen Buzz-Spieler aus Queue oder ID ermitteln
+  if (Array.isArray(STATE.players) && STATE.buzzQueue.length) {
+    const first = STATE.players.find(p => p.id === STATE.buzzQueue[0]);
+    STATE.currentBuzzPlayer = first || null;
+  } else if (Array.isArray(STATE.players) && state.currentBuzzPlayerId) {
+    STATE.currentBuzzPlayer = STATE.players.find(p => p.id === state.currentBuzzPlayerId) || null;
+  } else {
+    STATE.currentBuzzPlayer = null;
+  }
 
-        // aktuellen Buzz-Spieler aus Queue ermitteln (erstes Element)
-        if (Array.isArray(STATE.players) && STATE.buzzQueue.length) {
-          const first = STATE.players.find(p => p.id === STATE.buzzQueue[0]);
-          STATE.currentBuzzPlayer = first || null;
-        } else {
-          STATE.currentBuzzPlayer = null;
-        }
+  // Board & Frage
+  renderBoard();
+  if (STATE.currentCell) {
+    showQuestion(STATE.currentCell);
+  } else {
+    showQuestion(null);
+  }
 
-        // Board & Frage
-        renderBoard();
-        if (STATE.currentCell) {
-          showQuestion(STATE.currentCell);
-        } else {
-          showQuestion(null);
-        }
+  // Spieler-UI
+  renderPlayers();
+  highlightCurrentPlayer();
 
-        // Spieler-UI
-        renderPlayers();
-        highlightCurrentPlayer();
+  // 🔥 Buzzer-Zustand NUR anhand von STATE.buzzMode steuern
+  if (STATE.buzzMode) {
+    openBuzzer();
+  } else {
+    closeBuzzer();
+  }
 
-        // Buzzer öffnen/schließen – bei ALLEN
-        if (STATE.buzzMode && !prevBuzzMode) {
-          openBuzzer();
-        } else if (!STATE.buzzMode && prevBuzzMode) {
-          closeBuzzer();
-        } else if (STATE.buzzMode) {
-          // Buzz-Modus weiterhin aktiv → Anzeige aktualisieren
-          showBuzzHint(STATE.currentBuzzPlayer);
-        }
+  // Viewer-BUZZ-Button Zustand
+  if (viewerBuzzBtn) {
+    viewerBuzzBtn.disabled = !localCanBuzz();
+  }
 
-        // Viewer-BUZZ-Button aktivieren/deaktivieren
-        if (viewerBuzzBtn) {
-          viewerBuzzBtn.disabled = !localCanBuzz();
-        }
+  // Rand-Flash synchron
+  if (typeof state.flashSeq === "number" &&
+      state.flashSeq > lastFlashSeqSeen &&
+      state.flashType) {
+    lastFlashSeqSeen = state.flashSeq;
+    flashScreen(state.flashType === "correct" ? "correct" : "wrong");
+  }
+},
 
-        // Rand-Flash synchronisieren
-        if (typeof state.flashSeq === "number" &&
-            state.flashSeq > lastFlashSeqSeen &&
-            state.flashType) {
-          lastFlashSeqSeen = state.flashSeq;
-          flashScreen(state.flashType === "correct" ? "correct" : "wrong");
-        }
-      },
 
       onPlayers: (arr) => {
         if (!Array.isArray(arr)) return;
@@ -539,12 +537,13 @@ function wireMobileDrawer(){
 
 // ===== Buzzer =====
 function openBuzzer(){
-  STATE.buzzMode = true;
+  if (!buzzerBar) return;
 
+  // Nur UI: Buzzer-Leiste anzeigen
   buzzerBar.classList.remove("hidden");
-  showBuzzHint(STATE.currentBuzzPlayer);
-  updateMobileIndicator();
+  buzzerBar.style.display = "flex";
 
+  // Hinweistext anpassen
   if (isHost) {
     if (STATE.currentBuzzPlayer) {
       status(`Buzz: ${STATE.currentBuzzPlayer.name} ist dran.`);
@@ -555,10 +554,17 @@ function openBuzzer(){
     status("Buzzer offen – drücke BUZZ!, wenn du die Antwort weißt.");
   }
 
+  // Fragetext evtl. um Buzz-Hinweis ergänzen
+  showBuzzHint(STATE.currentBuzzPlayer);
+
+  // BUZZ!-Button für Viewer aktivieren/deaktivieren
   if (viewerBuzzBtn) {
     viewerBuzzBtn.disabled = !localCanBuzz();
   }
+
+  updateMobileIndicator();
 }
+
 
 function setCurrentBuzzPlayer(p){
   qsa(".player-item").forEach(el => el.classList.remove("buzzing"));
@@ -581,14 +587,20 @@ function showBuzzHint(p){
 }
 
 function closeBuzzer(){
-  buzzerBar.classList.add("hidden");
-  buzzerBtns.innerHTML = "";
+  if (buzzerBar) {
+    buzzerBar.classList.add("hidden");
+    buzzerBar.style.display = "none";
+  }
+  if (buzzerBtns) {
+    buzzerBtns.innerHTML = "";
+  }
   setCurrentBuzzPlayer(null);
-  STATE.buzzMode = false;
+  STATE.buzzMode = false;      // lokal konsistent halten
   STATE.buzzQueue = [];
   if (viewerBuzzBtn) viewerBuzzBtn.disabled = true;
   updateMobileIndicator();
 }
+
 
 // ===== End question + advance turn =====
 function endQuestionAndAdvance(){
