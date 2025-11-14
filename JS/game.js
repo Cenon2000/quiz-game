@@ -77,11 +77,12 @@ const STATE = (window.STATE ||= {
   hostName: sessionStorage.getItem("quiz:playerName") || "Host",
   buzzMode: false,
   currentBuzzPlayer: null,
+  flashSeq: 0,             // Zähler für visuelle Effekte (Rand-Flash)
 });
 
 // === Realtime (Broadcast) ===
 let roomRT = null;   // wird später in init() mit Cloud.openRoomChannel(...) belegt
-
+let lastFlashSeqSeen = 0;  // für Clients, um neue Flash-Events zu erkennen
 
 // ===== Elements =====
 const gameTitle     = $("gameTitle");
@@ -177,27 +178,61 @@ const turnIndicator = $("turnIndicator");
 
   // 6) Realtime-Kanal öffnen (nachdem wir initialen State geladen haben)
   if (roomCode && window.Cloud && typeof Cloud.openRoomChannel === "function") {
-    roomRT = Cloud.openRoomChannel(roomCode, {
-      onState: (state) => {
-        if (!state) return;
-        STATE.boardIndex  = state.boardIndex ?? 0;
-        STATE.used        = new Set(state.used || []);
-        STATE.currentCell = state.currentCell || null;
-        renderBoard();
-        if (STATE.currentCell) {
-          showQuestion(STATE.currentCell);
-        } else {
-          showQuestion(null);
-        }
-      },
-      onPlayers: (arr) => {
-        if (!Array.isArray(arr)) return;
-        STATE.players = arr;
-        renderPlayers();
-        highlightCurrentPlayer();
-      }
-    });
+  roomRT = Cloud.openRoomChannel(roomCode, {
+    onState: (state) => {
+  if (!state) return;
+
+  // Basiszustand
+  STATE.boardIndex  = state.boardIndex ?? 0;
+  STATE.used        = new Set(state.used || []);
+  STATE.currentCell = state.currentCell || null;
+  STATE.buzzMode    = !!state.buzzMode;
+
+  // Spieler-Index aus ID rekonstruieren
+  if (Array.isArray(STATE.players) && state.currentPlayerId) {
+    const idx = STATE.players.findIndex(p => p.id === state.currentPlayerId);
+    if (idx >= 0) {
+      STATE.currentPlayerIndex = idx;
+    }
   }
+
+  // Aktuellen Buzz-Spieler aus ID rekonstruieren
+  if (Array.isArray(STATE.players) && state.currentBuzzPlayerId) {
+    STATE.currentBuzzPlayer = STATE.players.find(p => p.id === state.currentBuzzPlayerId) || null;
+  } else {
+    STATE.currentBuzzPlayer = null;
+  }
+
+  // Board & Frage aktualisieren
+  renderBoard();
+  if (STATE.currentCell) {
+    showQuestion(STATE.currentCell);
+  } else {
+    showQuestion(null);
+  }
+
+  // Spieler-UI aktualisieren (wer ist dran, Mobile-Indikator etc.)
+  renderPlayers();
+  highlightCurrentPlayer();
+
+  // Visuelles Feedback (Rand-Flash) für alle synchronisieren
+  if (typeof state.flashSeq === "number" &&
+      state.flashSeq > lastFlashSeqSeen &&
+      state.flashType) {
+    lastFlashSeqSeen = state.flashSeq;
+    flashScreen(state.flashType === "correct" ? "correct" : "wrong");
+  }
+},
+
+    onPlayers: (arr) => {
+      if (!Array.isArray(arr)) return;
+      STATE.players = arr;
+      renderPlayers();
+      highlightCurrentPlayer();
+    }
+  });
+}
+
 })();
 
 
@@ -314,19 +349,32 @@ function showQuestion(cell){
 
 // ===== Controls =====
 // ---- HELPER: an ALLE Geräte senden (State + Spieler) ----
-function broadcastState() {
+function broadcastState(flashType) {
   if (!isHost || !roomRT) return;
+
+  // Wenn es einen visuellen Effekt (Rand-Flash) gibt, Zähler erhöhen
+  if (flashType) {
+    STATE.flashSeq = (STATE.flashSeq || 0) + 1;
+  }
+
+  const currentPlayer = STATE.players[STATE.currentPlayerIndex] || null;
 
   const state = {
     boardIndex: STATE.boardIndex,
     used: Array.from(STATE.used),
-    currentCell: STATE.currentCell   // null, wenn Frage beendet
+    currentCell: STATE.currentCell,   // null, wenn Frage beendet
+    buzzMode: STATE.buzzMode,
+    currentPlayerId: currentPlayer ? currentPlayer.id : null,
+    currentBuzzPlayerId: STATE.currentBuzzPlayer ? STATE.currentBuzzPlayer.id : null,
+    flashSeq: STATE.flashSeq || 0,
+    flashType: flashType || null,
   };
 
-  // Live an alle senden (sendState/ sendPlayers aktualisiert auch Supabase)
+  // Live an alle senden (State + Spieler)
   roomRT.sendState(state);
   roomRT.sendPlayers(STATE.players);
 }
+
 
 
 // ===== Controls =====
@@ -342,7 +390,7 @@ function wireControls(){
       updateScore(STATE.currentBuzzPlayer);
 
       endQuestionAndAdvance();   // hier wird 'used' gesetzt
-      broadcastState();          // <- NACH dem Enden senden (enthält used=null/currentCell)
+      broadcastState("correct");          // <- NACH dem Enden senden (enthält used=null/currentCell)
       return;
     }
 
@@ -354,7 +402,7 @@ function wireControls(){
     }
 
     endQuestionAndAdvance();     // setzt used + currentCell=null
-    broadcastState();            // <- NACH dem Enden senden
+    broadcastState("correct");            // <- NACH dem Enden senden
   });
 
   btnWrong.addEventListener("click", ()=>{
@@ -376,7 +424,7 @@ function wireControls(){
       } else {
         // keiner mehr übrig → Frage beenden
         endQuestionAndAdvance();
-        broadcastState();        // <- NACH dem Enden senden
+        broadcastState("wrong");        // <- NACH dem Enden senden
       }
       return;
     }
