@@ -168,7 +168,11 @@ async function updateRoomState(code, patch) {
 
 /* ========= Realtime (optional, minimal) ========= */
 
+// Realtime für einen Raum-Code
 function openRoomChannel(code, { onState, onPlayers } = {}) {
+  console.log("[Cloud] openRoomChannel für Room", code);
+
+  // 1) Realtime-Channel abonnieren: hört auf Änderungen an der Tabelle 'rooms'
   const channel = supabase
     .channel(`room:${code}`)
     .on(
@@ -180,26 +184,39 @@ function openRoomChannel(code, { onState, onPlayers } = {}) {
         filter: `code=eq.${code}`,
       },
       (payload) => {
-        const newRow = payload.new;
-        if (!newRow) return;
-        if (onState && newRow.state) onState(newRow.state);
-        if (onPlayers && newRow.players) onPlayers(newRow.players);
+        const row = payload.new;
+        if (!row) return;
+        console.log("[Cloud] Realtime-Update für Room", code, row);
+
+        if (onState && row.state) {
+          onState(row.state);
+        }
+        if (onPlayers && row.players) {
+          onPlayers(row.players);
+        }
       }
     )
-    .subscribe();
+    .subscribe((status) => {
+      console.log("[Cloud] Realtime-Status für Room", code, status);
+    });
 
+  // 2) Objekt zurückgeben, das game.js zum Senden benutzt
   return {
     async sendState(state) {
+      console.log("[Cloud] sendState", state);
       await updateRoomState(code, { state });
     },
     async sendPlayers(players) {
+      console.log("[Cloud] sendPlayers", players);
       await updateRoomState(code, { players });
     },
     stop() {
+      console.log("[Cloud] Channel schließen für Room", code);
       supabase.removeChannel(channel);
     },
   };
 }
+
 
 /* ========= Export ========= */
 
