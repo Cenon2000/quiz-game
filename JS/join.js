@@ -15,12 +15,10 @@ const prefill = params.get("code");
 if (prefill) {
   codeInput.value = prefill.toUpperCase();
   codeInput.readOnly = true;
-  // falls du das PIN-Feld nur bei vorgefülltem Code zeigen willst:
   pinWrap.style.display = "block";
 }
 
-// Wenn der User anfängt zu tippen, einfach das PIN-Feld anzeigen
-// (wir fragen die Info nicht mehr lokal ab, darum: immer zeigen)
+// PIN-Feld anzeigen/verstecken
 codeInput.addEventListener("input", () => {
   if (codeInput.value.trim().length > 0) {
     pinWrap.style.display = "block";
@@ -51,30 +49,36 @@ form.addEventListener("submit", async (e) => {
   }
 
   try {
-    // Genau EINMAL joinRoom aufrufen
+    // EINMAL joinRoom aufrufen
     const room = await Cloud.joinRoom({ code, playerName: nick, pin });
 
-    // Den tatsächlich verwendeten Namen ermitteln (falls (2), (3) angehängt wurden)
-    const normalize = s => (s || "").trim().toLowerCase();
+    // Den tatsächlich verwendeten Namen + Player-ID finden
+    const normalize = (s) => (s || "").trim().toLowerCase();
     let effectiveName = nick;
     let myPlayerId = null;
+
     if (Array.isArray(room.players) && room.players.length) {
+      // Entweder exakter Match (falls kein "(2)" angehängt wurde)
       const exact = room.players.find(p => normalize(p.name) === normalize(nick));
-      effectiveName = exact?.name || room.players[room.players.length - 1].name || nick;
+      // Oder der zuletzt hinzugefügte Spieler (unser Join)
+      const chosen = exact || room.players[room.players.length - 1];
+
+      effectiveName = chosen?.name || nick;
       myPlayerId = chosen?.id || null;
     }
 
+    // Session-Infos für game.js speichern
     sessionStorage.setItem("quiz:roomCode", code);
-  sessionStorage.setItem("quiz:playerName", effectiveName);
-  if (myPlayerId) {
-    sessionStorage.setItem("quiz:playerId", myPlayerId);
-  }
-  sessionStorage.removeItem("quiz:isHost");
+    sessionStorage.setItem("quiz:playerName", effectiveName);
+    if (myPlayerId) {
+      sessionStorage.setItem("quiz:playerId", myPlayerId);
+    }
+    sessionStorage.removeItem("quiz:isHost"); // Joiner ist nie Host
 
-  window.location.href = `game.html?code=${encodeURIComponent(code)}`;
+    // Ab ins Spielfeld
+    window.location.href = `game.html?code=${encodeURIComponent(code)}`;
   } catch (err) {
     console.error("Join error:", err);
     alert(err.message || "Beitritt zum Raum fehlgeschlagen.");
   }
 });
-
