@@ -182,13 +182,14 @@ const turnIndicator = $("turnIndicator");
     onState: (state) => {
   if (!state) return;
 
-  // Basiszustand
+  const prevBuzzMode = STATE.buzzMode;
+
   STATE.boardIndex  = state.boardIndex ?? 0;
   STATE.used        = new Set(state.used || []);
   STATE.currentCell = state.currentCell || null;
   STATE.buzzMode    = !!state.buzzMode;
 
-  // Spieler-Index aus ID rekonstruieren
+  // aktuellen Spieler aus ID ermitteln
   if (Array.isArray(STATE.players) && state.currentPlayerId) {
     const idx = STATE.players.findIndex(p => p.id === state.currentPlayerId);
     if (idx >= 0) {
@@ -196,14 +197,14 @@ const turnIndicator = $("turnIndicator");
     }
   }
 
-  // Aktuellen Buzz-Spieler aus ID rekonstruieren
+  // aktuellen Buzz-Spieler aus ID
   if (Array.isArray(STATE.players) && state.currentBuzzPlayerId) {
     STATE.currentBuzzPlayer = STATE.players.find(p => p.id === state.currentBuzzPlayerId) || null;
   } else {
     STATE.currentBuzzPlayer = null;
   }
 
-  // Board & Frage aktualisieren
+  // Board / Frage
   renderBoard();
   if (STATE.currentCell) {
     showQuestion(STATE.currentCell);
@@ -211,11 +212,18 @@ const turnIndicator = $("turnIndicator");
     showQuestion(null);
   }
 
-  // Spieler-UI aktualisieren (wer ist dran, Mobile-Indikator etc.)
+  // Spieler-UI
   renderPlayers();
   highlightCurrentPlayer();
 
-  // Visuelles Feedback (Rand-Flash) für alle synchronisieren
+  // Buzzer-Bar abhängig vom Modus
+  if (STATE.buzzMode && !prevBuzzMode) {
+    openBuzzer();
+  } else if (!STATE.buzzMode && prevBuzzMode) {
+    closeBuzzer();
+  }
+
+  // Rand-Flash überall
   if (typeof state.flashSeq === "number" &&
       state.flashSeq > lastFlashSeqSeen &&
       state.flashType) {
@@ -223,6 +231,7 @@ const turnIndicator = $("turnIndicator");
     flashScreen(state.flashType === "correct" ? "correct" : "wrong");
   }
 },
+
 
     onPlayers: (arr) => {
       if (!Array.isArray(arr)) return;
@@ -349,10 +358,12 @@ function showQuestion(cell){
 
 // ===== Controls =====
 // ---- HELPER: an ALLE Geräte senden (State + Spieler) ----
+
+
 function broadcastState(flashType) {
   if (!isHost || !roomRT) return;
 
-  // Wenn es einen visuellen Effekt (Rand-Flash) gibt, Zähler erhöhen
+  // Zähler für „Blinken“-Events erhöhen, wenn ein Flash gewünscht ist
   if (flashType) {
     STATE.flashSeq = (STATE.flashSeq || 0) + 1;
   }
@@ -370,10 +381,10 @@ function broadcastState(flashType) {
     flashType: flashType || null,
   };
 
-  // Live an alle senden (State + Spieler)
   roomRT.sendState(state);
   roomRT.sendPlayers(STATE.players);
 }
+
 
 
 
@@ -439,18 +450,12 @@ function wireControls(){
       if (isHost && roomRT) roomRT.sendPlayers(STATE.players);
     }
 
-        openBuzzer(); // Host öffnet Buzzer
+          openBuzzer(); // Host öffnet Buzzer (setzt STATE.buzzMode = true)
 
-    // Der Zustand bleibt mit currentCell AKTIV (Frage läuft weiter)
-    if (isHost && roomRT){
-      const state = {
-        boardIndex: STATE.boardIndex,
-        used: Array.from(STATE.used),
-        currentCell: STATE.currentCell   // noch aktiv!
-      };
-      roomRT.sendState(state);
-      roomRT.sendPlayers(STATE.players);
-    }
+  // Der Zustand bleibt mit currentCell AKTIV (Frage läuft weiter)
+  // -> Buzzer-Mode + roter Flash sollen bei allen sichtbar sein
+  broadcastState("wrong");
+
   });
 }
 
