@@ -74,15 +74,25 @@
         </div>
 
         <!-- Buzzer -->
-        <section id="buzzerBar" class="buzzer hidden">
-          <div class="buzzer-title">Buzzer offen – Host wählt, wer versucht zu antworten.</div>
-          <div id="buzzerBtns" class="buzzer-btns host-only"></div>
-          <div class="buzzer-hint viewer-only">
-  <button id="viewerBuzzBtn" class="btn">BUZZ!</button>
-  <span>Meldet euch beim Host, wer buzzern will.</span>
-</div>
+        <!-- Buzzer -->
+<section id="buzzerBar" class="buzzer hidden">
+  <div class="buzzer-title">Buzzer offen – Host wählt, wer versucht zu antworten.</div>
 
-        </section>
+  <div class="buzzer-row">
+    <!-- Host: Übersicht, wer gerade buzzert / evtl. Zusatzinfos -->
+    <div id="buzzerBtns" class="buzzer-btns host-only">
+      <!-- Wir nutzen hier aktuell keine Buttons mehr für die Spieler-Auswahl,
+           aber lassen das DIV für spätere Erweiterungen drin -->
+    </div>
+
+    <!-- Viewer: Buzz-Button + Hinweis -->
+    <div class="buzzer-hint viewer-only">
+      <button id="viewerBuzzBtn" class="btn">BUZZ!</button>
+      <span>Meldet euch beim Host, wer buzzern will.</span>
+    </div>
+  </div>
+</section>
+
 
         <div id="status" class="status"></div>
       </section>

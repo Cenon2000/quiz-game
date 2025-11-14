@@ -644,3 +644,58 @@ body.is-host .question-bar{
   color: #fff !important;
   box-shadow: 0 0 6px rgba(239, 68, 68, 0.5);
 }
+
+/* === Buzzer-Feinschliff (nur Buzzer-spezifisch) === */
+
+/* Buzzer-Leiste: immer sichtbar, sobald .hidden entfernt ist */
+.buzzer {
+  display: flex !important;          /* Erzwingt flex, falls etwas anderes dazwischenfunkt */
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  max-width: 520px;
+  margin: 10px auto 0;
+}
+
+/* Verstecken NUR mit .hidden */
+.buzzer.hidden {
+  display: none !important;
+}
+
+/* Titel im Buzzer-Balken */
+.buzzer-title {
+  font-weight: 600;
+  font-size: 0.9rem;
+}
+
+/* Innere Zeile: Host-/Viewer-Bereich nebeneinander */
+.buzzer-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  width: 100%;
+  justify-content: space-between;
+}
+
+/* Viewer-Hint mit BUZZ-Button nebeneinander */
+.buzzer-hint {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* BUZZ-Button etwas hervorheben */
+#viewerBuzzBtn {
+  min-width: 80px;
+  font-size: 0.95rem;
+  font-weight: 800;
+}
+
+/* Auf Mobile nur die Reihenfolge, Layout bleibt gleich */
+@media (max-width: 860px) {
+  .buzzer {
+    order: 3; /* Unter der Frage, über Status/sonstigem Inhalt */
+  }
+}
