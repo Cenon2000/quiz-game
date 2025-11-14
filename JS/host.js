@@ -131,9 +131,29 @@ async function onHostFormSubmit(evt) {
   const maxPlayers = parseInt(maxPlayersInput.value, 10) || 4;
   const pin        = pinInput.value.trim() || null;
 
-  // Hier aus deinem UI die ausgewählte Quiz-ID holen
-  const quizId    = quizSelect.value; // <option value="...quiz.id...">
-  const quizTitle = quizSelect.selectedOptions[0]?.textContent || "";
+  // === Quiz-ID ermitteln ===
+  // Variante A: <select id="quizSelect">...</select>
+  const quizSelect = document.getElementById("quizSelect");
+  let quizId = null;
+  let quizTitle = "";
+
+  if (quizSelect) {
+    quizId = quizSelect.value || null;
+    quizTitle = quizSelect.selectedOptions[0]?.textContent?.trim() || "";
+  } else {
+    // Variante B: Radio-Buttons: <input type="radio" name="quizId" value="...">
+    const checked = document.querySelector('input[name="quizId"]:checked');
+    if (checked) {
+      quizId = checked.value;
+      // Titel aus einem data-Attribut oder Nachbar-Element holen, falls du sowas hast
+      quizTitle = checked.dataset.title || checked.getAttribute("data-title") || "";
+    }
+  }
+
+  if (!quizId) {
+    alert("Bitte zuerst ein Quiz auswählen.");
+    return;
+  }
 
   try {
     const room = await Cloud.createRoom({
@@ -148,20 +168,21 @@ async function onHostFormSubmit(evt) {
         boardIndex: 0,
         used: [],
         currentCell: null,
-        quizId,              // falls du es zusätzlich in state speichern willst
+        quizId,   // optional auch im state merken
       },
     });
 
+    // Host-Metadaten merken (du nutzt sessionStorage)
     sessionStorage.setItem("quiz:roomCode", room.code);
-sessionStorage.setItem("quiz:isHost", "1");
-sessionStorage.setItem("quiz:playerName", nickname);
+    sessionStorage.setItem("quiz:isHost", "1");
+    sessionStorage.setItem("quiz:playerName", nickname);
 
-// Weiterleitung
-window.location.href = `game.html?code=${encodeURIComponent(room.code)}&host=1`;
-
+    // Direkt ins Spiel
+    window.location.href = `game.html?code=${encodeURIComponent(room.code)}&host=1`;
   } catch (err) {
     console.error("Fehler beim Erstellen des Raums:", err);
     alert(err.message || "Raum konnte nicht erstellt werden.");
   }
 }
+
 
