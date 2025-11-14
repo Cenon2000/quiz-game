@@ -64,7 +64,7 @@ function generateRoomCode(length = 4) {
   return out;
 }
 
-async function createRoom({ gameName, hostName, maxPlayers, pin, initialState }) {
+async function createRoom({ gameName, hostName, maxPlayers, pin, quizId, quizTitle, initialState }) {
   const code = generateRoomCode(4);
 
   const payload = {
@@ -73,6 +73,8 @@ async function createRoom({ gameName, hostName, maxPlayers, pin, initialState })
     host_name: hostName || "Host",
     max_players: maxPlayers || 4,
     pin: pin || null,
+    quiz_id: quizId || null,          // <---
+    quiz_title: quizTitle || null,    // <--- optional
     state: initialState || {},
     players: [],
     status: "open",
@@ -91,6 +93,8 @@ async function createRoom({ gameName, hostName, maxPlayers, pin, initialState })
 
   return data;
 }
+
+
 
 async function getRoom(code) {
   const { data, error } = await supabase

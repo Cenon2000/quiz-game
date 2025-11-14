@@ -55,12 +55,14 @@ form.addEventListener("submit", async (e) => {
     // -> nutzt Cloud.joinRoom aus JS/cloud.js
     await Cloud.joinRoom({ code, playerName: nick, pin });
 
-    // Infos speichern, damit game.js weiß, wer wir sind
-    sessionStorage.setItem("quiz:playerName", nick);
-    sessionStorage.setItem("quiz:roomCode", code);
+    const room = await Cloud.joinRoom({ code, playerName: name, pin });
 
-    // Weiter zur Spielseite
-    window.location.href = `game.html?code=${encodeURIComponent(code)}`;
+sessionStorage.setItem("quiz:roomCode", code);
+sessionStorage.setItem("quiz:playerName", name);
+sessionStorage.removeItem("quiz:isHost"); // Sicherheit
+
+window.location.href = `game.html?code=${encodeURIComponent(code)}`;
+
   } catch (err) {
     console.error("Join error:", err);
     alert(err.message || "Beitritt zum Raum fehlgeschlagen.");

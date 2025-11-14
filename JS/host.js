@@ -53,6 +53,9 @@ form.addEventListener("submit", async (e) => {
   const pin        = String(data.get("pin") || "").trim() || null;
 
   const selectedQuizId = quizSelect.value;
+  const selectedQuizTitle =
+  quizSelect.selectedOptions[0]?.textContent || "(Ohne Titel)";
+
   if (!selectedQuizId) {
     alert("Bitte ein Quiz auswählen.");
     return;
@@ -78,28 +81,31 @@ form.addEventListener("submit", async (e) => {
       quizId: selectedQuizId,
     };
 
-    const room = await Cloud.createRoom({
-      gameName,
-      hostName,
-      maxPlayers,
-      pin,
-      initialState,
-    });
+    // Beispiel in host.js, im submit-Handler
+const room = await Cloud.createRoom({
+  gameName,
+  hostName: nickname,
+  maxPlayers,
+  pin,
+  quizId,
+  quizTitle,
+  initialState: {
+    phase: "lobby",
+    boardIndex: 0,
+    used: [],
+    currentCell: null,
+  },
+});
 
-    // Host-Infos lokal merken (für game.js, um Host/Spieler zu unterscheiden)
-    localStorage.setItem("quiz:roomCode", room.code);
-    localStorage.setItem("quiz:playerName", hostName);
-    localStorage.setItem("quiz:isHost", "1");
+// Host merkt sich: ich bin Host für diesen Raum
+sessionStorage.setItem("quiz:roomCode", room.code);
+sessionStorage.setItem("quiz:isHost", "1");
+sessionStorage.setItem("quiz:playerName", nickname);
 
-    // Code und Invite-Link anzeigen
-    codeEl.textContent = room.code;
+// Direkt in die Spielansicht
+window.location.href = `game.html?code=${encodeURIComponent(room.code)}&host=1`;
 
-    const link = new URL(location.origin + location.pathname.replace("host.html", "join.html"));
-    link.searchParams.set("code", room.code);
-    inviteLink.href = link.toString();
 
-    form.style.display = "none";
-    lobbyView.style.display = "block";
   } catch (err) {
     console.error("Fehler beim Erstellen des Raums:", err);
     alert(err.message || "Raum konnte nicht erstellt werden. Bitte später erneut versuchen.");
@@ -116,3 +122,46 @@ copyBtn.addEventListener("click", async () => {
     alert("Kopieren fehlgeschlagen – bitte manuell markieren.");
   }
 });
+
+async function onHostFormSubmit(evt) {
+  evt.preventDefault();
+
+  const gameName   = gameNameInput.value.trim();
+  const nickname   = nicknameInput.value.trim();
+  const maxPlayers = parseInt(maxPlayersInput.value, 10) || 4;
+  const pin        = pinInput.value.trim() || null;
+
+  // Hier aus deinem UI die ausgewählte Quiz-ID holen
+  const quizId    = quizSelect.value; // <option value="...quiz.id...">
+  const quizTitle = quizSelect.selectedOptions[0]?.textContent || "";
+
+  try {
+    const room = await Cloud.createRoom({
+      gameName,
+      hostName: nickname,
+      maxPlayers,
+      pin,
+      quizId,
+      quizTitle,
+      initialState: {
+        phase: "lobby",
+        boardIndex: 0,
+        used: [],
+        currentCell: null,
+        quizId,              // falls du es zusätzlich in state speichern willst
+      },
+    });
+
+    sessionStorage.setItem("quiz:roomCode", room.code);
+sessionStorage.setItem("quiz:isHost", "1");
+sessionStorage.setItem("quiz:playerName", nickname);
+
+// Weiterleitung
+window.location.href = `game.html?code=${encodeURIComponent(room.code)}&host=1`;
+
+  } catch (err) {
+    console.error("Fehler beim Erstellen des Raums:", err);
+    alert(err.message || "Raum konnte nicht erstellt werden.");
+  }
+}
+

@@ -1,7 +1,7 @@
 // ===== Helpers =====
 const $   = id  => document.getElementById(id);
 const qsa = sel => [...document.querySelectorAll(sel)];
-const params = new URLSearchParams(location.search);
+const params   = new URLSearchParams(location.search);
 const roomCode = params.get("code")?.toUpperCase() || null;
 const param = (name) => params.get(name);
 
@@ -49,10 +49,20 @@ function flashScreen(type){
 $("year") && ($("year").textContent = new Date().getFullYear());
 
 // ===== Role visibility =====
-const isHost = (param("role") || "").toLowerCase() === "host";
+// Host, wenn:
+// - URL: ?role=host  (alt, für Tests)
+// - ODER URL: ?host=1 (neu, von host.html-Redirect)
+// - ODER localStorage-Flag gesetzt ist
+const isHost =
+  (param("role") || "").toLowerCase() === "host" ||
+  param("host") === "1" ||
+  sessionStorage.getItem("quiz:isHost") === "1";
+
+
 qsa(".host-only").forEach(el => el.classList.toggle("hidden", !isHost));
 qsa(".viewer-only").forEach(el => el.classList.toggle("hidden", isHost));
 document.body.classList.toggle("is-host", isHost);
+
 
 
 // ===== GLOBAL STATE (eine Quelle der Wahrheit) =====
@@ -64,7 +74,7 @@ const STATE = (window.STATE ||= {
   currentCell: null,       // {catIdx,qIdx,points,text,answer}
   players: [],             // nur Spieler (ohne Host)
   currentPlayerIndex: 0,
-  hostName: (param("host") || "Host"),
+  hostName: sessionStorage.getItem("quiz:playerName") || "Host",
   buzzMode: false,
   currentBuzzPlayer: null,
 });
@@ -92,9 +102,38 @@ const turnIndicator = $("turnIndicator");
 
 // ===== Init =====
 (async function init(){
-  const quizId = param("quizId");
+  let quizId = param("quizId"); // Fallback für alte Links
 
-  // 1) Versuch: aus Supabase über Cloud.loadQuizById laden
+  // 1) Wenn wir einen Room-Code haben: Room + State + Players aus Supabase laden
+  if (roomCode && window.Cloud && typeof Cloud.getRoom === "function") {
+    try {
+      const room = await Cloud.getRoom(roomCode);
+
+      // Host-Name aus Room übernehmen (falls vorhanden)
+      if (room.host_name) {
+        STATE.hostName = room.host_name;
+      }
+
+      // Quiz-ID aus Room-State oder Spalte quiz_id holen
+      quizId = room.state?.quizId || room.quiz_id || quizId;
+
+      // initialen State übernehmen
+      if (room.state) {
+        STATE.boardIndex  = room.state.boardIndex ?? 0;
+        STATE.used        = new Set(room.state.used || []);
+        STATE.currentCell = room.state.currentCell || null;
+      }
+
+      // Spieler aus Room übernehmen
+      if (Array.isArray(room.players)) {
+        STATE.players = room.players;
+      }
+    } catch (err) {
+      console.error("Room laden fehlgeschlagen:", err);
+    }
+  }
+
+  // 2) Quiz laden (Supabase)
   try {
     if (quizId && window.Cloud && typeof Cloud.loadQuizById === "function") {
       STATE.quiz = await Cloud.loadQuizById(quizId);
@@ -103,24 +142,25 @@ const turnIndicator = $("turnIndicator");
     console.error("Quiz Laden von Supabase fehlgeschlagen:", err);
   }
 
-  // 2) Fallback: LocalStorage
-  if (!STATE.quiz && quizId){
-    try{
-      const list = JSON.parse(localStorage.getItem("quiz:quizzes")||"[]");
-      STATE.quiz = list.find(q=>q.id===quizId) || null;
-    }catch(err){
+  // 3) (Optional) Fallback: LocalStorage, falls du das weiter behalten willst
+  if (!STATE.quiz && quizId) {
+    try {
+      const list = JSON.parse(localStorage.getItem("quiz:quizzes") || "[]");
+      STATE.quiz = list.find(q => q.id === quizId) || null;
+    } catch (err) {
       console.error("Fallback localStorage fehlgeschlagen:", err);
     }
   }
 
-  if (STATE.quiz){
+  // 4) Titel / Status
+  if (STATE.quiz) {
     gameTitle.textContent = STATE.quiz.title || "Quiz";
   } else {
     status("Kein Quiz gefunden. Nutze setQuizForTest(...) in der Konsole.");
     gameTitle.textContent = "Quiz";
   }
 
-  // UI & Controls IMMER verdrahten (auch ohne Quiz!)
+  // 5) UI & Controls verdrahten (immer)
   hostNameBox.textContent = STATE.hostName;
   renderPlayers();
   highlightCurrentPlayer();
@@ -134,32 +174,32 @@ const turnIndicator = $("turnIndicator");
 
   window.addEventListener("resize", applyMobileHeights);
   window.addEventListener("orientationchange", applyMobileHeights);
+
+  // 6) Realtime-Kanal öffnen (nachdem wir initialen State geladen haben)
+  if (roomCode && window.Cloud && typeof Cloud.openRoomChannel === "function") {
+    roomRT = Cloud.openRoomChannel(roomCode, {
+      onState: (state) => {
+        if (!state) return;
+        STATE.boardIndex  = state.boardIndex ?? 0;
+        STATE.used        = new Set(state.used || []);
+        STATE.currentCell = state.currentCell || null;
+        renderBoard();
+        if (STATE.currentCell) {
+          showQuestion(STATE.currentCell);
+        } else {
+          showQuestion(null);
+        }
+      },
+      onPlayers: (arr) => {
+        if (!Array.isArray(arr)) return;
+        STATE.players = arr;
+        renderPlayers();
+        highlightCurrentPlayer();
+      }
+    });
+  }
 })();
 
-
-// Realtime-Kanal öffnen (nur wenn Code + Funktion vorhanden)
-if (roomCode && window.Cloud && typeof Cloud.openRoomChannel === "function") {
-  roomRT = Cloud.openRoomChannel(roomCode, {
-    onState: (state) => {
-      if (!state) return;
-      STATE.boardIndex  = state.boardIndex ?? 0;
-      STATE.used        = new Set(state.used || []);
-      STATE.currentCell = state.currentCell || null;
-      renderBoard();
-      if (STATE.currentCell) {
-        showQuestion(STATE.currentCell);
-      } else {
-        showQuestion(null);
-      }
-    },
-    onPlayers: (arr) => {
-      if (!Array.isArray(arr)) return;
-      STATE.players = arr;
-      renderPlayers();
-      highlightCurrentPlayer();
-    }
-  });
-}
 
 
 
@@ -254,27 +294,6 @@ function onCellClick(catIdx, qIdx) {
   // 3) Broadcast an alle Clients (Supabase Realtime)
   broadcastState();
 }
-
-
-
-
-  // ---- LIVE UPDATE: Frage ausgewählt ----
-if (isHost && roomRT) {
-  const state = {
-    boardIndex: STATE.boardIndex,
-    used: Array.from(STATE.used),
-    currentCell: STATE.currentCell
-  };
-
-  // Persistenz (für Reload)
-  Cloud.updateRoomState(roomCode, state).catch(console.error);
-
-  // Live an alle Geräte senden
-  roomRT.sendState(state);
-}
-
-
-
 
 function showQuestion(cell){
   if (!cell){
