@@ -112,29 +112,45 @@ async function getRoom(code) {
 }
 
 async function joinRoom({ code, playerName, pin }) {
+  // 1) Raum laden
   const room = await getRoom(code);
 
+  // 2) PIN prüfen (falls gesetzt)
   if (room.pin && room.pin !== pin) {
     throw new Error("Falsche PIN.");
   }
 
+  // 3) Bisherige Spieler kopieren
   const players = Array.isArray(room.players) ? room.players.slice() : [];
 
-  if (players.some(p => p.name === playerName)) {
-    throw new Error("Name bereits im Raum.");
+  // 4) Namen normalisieren + leere Namen abfangen
+  const normalize = (s) => (s || "").trim().toLowerCase();
+  let name = (playerName || "").trim();
+  if (!name) {
+    name = "Spieler";
   }
 
-  if (players.length >= room.max_players) {
-    throw new Error("Raum ist voll.");
+  // 5) Wenn Name schon existiert → automatisch durchnummerieren
+  if (players.some(p => normalize(p.name) === normalize(name))) {
+    const base = name;
+    let n = 2;
+    let candidate = `${base} (${n})`;
+    while (players.some(p => normalize(p.name) === normalize(candidate))) {
+      n++;
+      candidate = `${base} (${n})`;
+    }
+    name = candidate;
   }
 
+  // 6) Neuen Spieler eintragen
   players.push({
     id: crypto.randomUUID ? crypto.randomUUID() : String(Date.now()),
-    name: playerName,
+    name,
     score: 0,
     joined_at: new Date().toISOString(),
   });
 
+  // 7) Room aktualisieren
   const { data, error } = await supabase
     .from("rooms")
     .update({ players })
@@ -149,6 +165,7 @@ async function joinRoom({ code, playerName, pin }) {
 
   return data;
 }
+
 
 async function updateRoomState(code, patch) {
   const { data, error } = await supabase
