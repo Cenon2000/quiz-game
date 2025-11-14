@@ -9,6 +9,8 @@ const codeEl     = document.getElementById("lobby-code");
 const copyBtn    = document.getElementById("copy-code");
 const inviteLink = document.getElementById("invite-link");
 const quizSelect = document.getElementById("quizSelect");
+const startBtn  = document.getElementById("btn-start-game");
+
 
 // --- Quizzes aus Supabase laden und Dropdown füllen ---
 async function loadQuizzesIntoSelect() {
@@ -95,10 +97,20 @@ form.addEventListener("submit", async (e) => {
 
     form.style.display = "none";
     lobbyView.style.display = "block";
+
+    if (startBtn) {
+    startBtn.onclick = () => {
+      const code = room.code;
+      window.location.href = `game.html?code=${encodeURIComponent(code)}&host=1`;
+    };
+  }
+
   } catch (err) {
     console.error("Fehler beim Erstellen des Raums:", err);
     alert(err.message || "Raum konnte nicht erstellt werden.");
   }
+
+  
 });
 
 
