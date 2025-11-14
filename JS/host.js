@@ -46,71 +46,61 @@ loadQuizzesIntoSelect();
 form.addEventListener("submit", async (e) => {
   e.preventDefault();
 
-  const data = new FormData(form);
-  const gameName   = String(data.get("gameName") || "").trim();
-  const hostName   = String(data.get("nickname") || "").trim();
-  const maxPlayers = Number(data.get("maxPlayers")) || 2;
-  const pin        = String(data.get("pin") || "").trim() || null;
+  const gameName   = document.getElementById("gameName").value.trim();
+  const nickname   = document.getElementById("nickname").value.trim();
+  const maxPlayers = parseInt(document.getElementById("maxPlayers").value, 10) || 4;
+  const pin        = document.getElementById("pin").value.trim() || null;
 
-  const selectedQuizId = quizSelect.value;
-  const selectedQuizTitle =
-  quizSelect.selectedOptions[0]?.textContent || "(Ohne Titel)";
+  // === Quiz-ID aus dem <select id="quizSelect"> holen ===
+  const quizId = quizSelect.value || null;
+  const quizTitle = quizSelect.selectedOptions[0]?.textContent?.trim() || "";
 
-  if (!selectedQuizId) {
-    alert("Bitte ein Quiz auswählen.");
+  if (!quizId) {
+    alert("Bitte zuerst ein Quiz auswählen.");
     return;
   }
 
-  if (!gameName || !hostName || maxPlayers < 2) {
+  if (!gameName || !nickname || maxPlayers < 2) {
     alert("Bitte alle Pflichtfelder prüfen.");
     return;
   }
 
-  if (!window.Cloud || !Cloud.createRoom) {
-    alert("Cloud API nicht verfügbar.");
-    return;
-  }
-
   try {
-    // initialer Spielzustand, inkl. gewähltem Quiz
-    const initialState = {
-      phase: "lobby",
-      boardIndex: 0,
-      currentCell: null,
-      used: [],
-      quizId: selectedQuizId,
-    };
+    const room = await Cloud.createRoom({
+      gameName,
+      hostName: nickname,
+      maxPlayers,
+      pin,
+      quizId,
+      quizTitle,
+      initialState: {
+        phase: "lobby",
+        boardIndex: 0,
+        used: [],
+        currentCell: null,
+        quizId,   // optional auch im state merken
+      },
+    });
 
-    // Beispiel in host.js, im submit-Handler
-const room = await Cloud.createRoom({
-  gameName,
-  hostName: nickname,
-  maxPlayers,
-  pin,
-  quizId,
-  quizTitle,
-  initialState: {
-    phase: "lobby",
-    boardIndex: 0,
-    used: [],
-    currentCell: null,
-  },
-});
+    // Host-Daten für game.js merken (du nutzt sessionStorage)
+    sessionStorage.setItem("quiz:roomCode", room.code);
+    sessionStorage.setItem("quiz:isHost", "1");
+    sessionStorage.setItem("quiz:playerName", nickname);
 
-// Host merkt sich: ich bin Host für diesen Raum
-sessionStorage.setItem("quiz:roomCode", room.code);
-sessionStorage.setItem("quiz:isHost", "1");
-sessionStorage.setItem("quiz:playerName", nickname);
+    // Lobby-Ansicht mit Code + Link anzeigen
+    codeEl.textContent = room.code;
+    const link = new URL(location.origin + location.pathname.replace("host.html","join.html"));
+    link.searchParams.set("code", room.code);
+    inviteLink.href = link.toString();
 
-// Direkt in die Spielansicht
-window.location.href = `game.html?code=${encodeURIComponent(room.code)}&host=1`;
-
-
+    form.style.display = "none";
+    lobbyView.style.display = "block";
   } catch (err) {
     console.error("Fehler beim Erstellen des Raums:", err);
-    alert(err.message || "Raum konnte nicht erstellt werden. Bitte später erneut versuchen.");
+    alert(err.message || "Raum konnte nicht erstellt werden.");
   }
 });
+
 
 // --- Kopieren-Button ---
 copyBtn.addEventListener("click", async () => {
