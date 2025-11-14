@@ -186,7 +186,7 @@ let viewerBuzzBtn = $("viewerBuzzBtn");
   STATE.buzzMode    = !!state.buzzMode;
   STATE.buzzQueue   = Array.isArray(state.buzzQueue) ? state.buzzQueue : [];
 
-  // aktuellen Spieler (Turn) aus ID ermitteln
+  // aktuellen Spieler aus ID ermitteln
   if (Array.isArray(STATE.players) && state.currentPlayerId) {
     const idx = STATE.players.findIndex(p => p.id === state.currentPlayerId);
     if (idx >= 0) {
@@ -194,7 +194,7 @@ let viewerBuzzBtn = $("viewerBuzzBtn");
     }
   }
 
-  // aktuellen Buzz-Spieler aus Queue oder ID ermitteln
+  // aktuellen Buzz-Spieler aus Queue oder ID
   if (Array.isArray(STATE.players) && STATE.buzzQueue.length) {
     const first = STATE.players.find(p => p.id === STATE.buzzQueue[0]);
     STATE.currentBuzzPlayer = first || null;
@@ -216,19 +216,19 @@ let viewerBuzzBtn = $("viewerBuzzBtn");
   renderPlayers();
   highlightCurrentPlayer();
 
-  // 🔥 Buzzer-Zustand NUR anhand von STATE.buzzMode steuern
+  // 🔥 Buzzer nur anhand von STATE.buzzMode steuern
   if (STATE.buzzMode) {
     openBuzzer();
   } else {
     closeBuzzer();
   }
 
-  // Viewer-BUZZ-Button Zustand
+  // BUZZ!-Button für Spieler ✓/✗
   if (viewerBuzzBtn) {
     viewerBuzzBtn.disabled = !localCanBuzz();
   }
 
-  // Rand-Flash synchron
+  // Rand-Flash synchronisieren
   if (typeof state.flashSeq === "number" &&
       state.flashSeq > lastFlashSeqSeen &&
       state.flashType) {
@@ -236,6 +236,7 @@ let viewerBuzzBtn = $("viewerBuzzBtn");
     flashScreen(state.flashType === "correct" ? "correct" : "wrong");
   }
 },
+
 
 
       onPlayers: (arr) => {
@@ -484,21 +485,23 @@ function wireControls(){
 
     // --- normaler aktiver Spieler falsch → Buzz öffnen ---
     const active = getActivePlayer();
-    const half = Math.floor(STATE.currentCell.points/2);
-    if (active){
-      active.score -= half;
-      updateScore(active);
-      if (isHost && roomRT) roomRT.sendPlayers(STATE.players);
-    }
+  const half = Math.floor(STATE.currentCell.points/2);
+  if (active){
+    active.score -= half;
+    updateScore(active);
+    if (isHost && roomRT) roomRT.sendPlayers(STATE.players);
+  }
 
-    // Buzzer-Phase starten: andere Spieler dürfen buzzern
-    STATE.buzzMode = true;
-    STATE.buzzQueue = [];
-    STATE.currentBuzzPlayer = null;
+  // 🔥 HIER: Buzzer-Phase global einschalten
+  STATE.buzzMode = true;
+  STATE.buzzQueue = [];
+  STATE.currentBuzzPlayer = null;
 
-    openBuzzer();
-    broadcastState("wrong");
-  });
+  // Host öffnet den Buzzer lokal…
+  openBuzzer();
+  // …und synchronisiert den Zustand (inkl. buzzMode & Flash) an alle
+  broadcastState("wrong");
+});
 }
 
 // ===== Mobile Drawer =====
