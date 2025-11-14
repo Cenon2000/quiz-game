@@ -389,8 +389,29 @@ function broadcastState(flashType) {
 }
 
 function getLocalPlayerId(){
-  return sessionStorage.getItem("quiz:playerId") || null;
+  // 1) Direkt aus sessionStorage lesen, falls schon gesetzt
+  let id = sessionStorage.getItem("quiz:playerId");
+  if (id) return id;
+
+  // 2) Fallback: über den gespeicherten Spielernamen den Spieler im STATE suchen
+  const storedName = sessionStorage.getItem("quiz:playerName");
+  if (!storedName || !Array.isArray(STATE.players) || !STATE.players.length) {
+    return null;
+  }
+
+  const normalize = (s) => (s || "").trim().toLowerCase();
+  const target = normalize(storedName);
+
+  const match = STATE.players.find(p => normalize(p.name) === target);
+  if (match && match.id) {
+    // Einmal gefunden → in sessionStorage merken, damit es ab dann schnell geht
+    sessionStorage.setItem("quiz:playerId", match.id);
+    return match.id;
+  }
+
+  return null;
 }
+
 
 function localCanBuzz(){
   const pid = getLocalPlayerId();
