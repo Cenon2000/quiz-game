@@ -60,6 +60,7 @@ const STATE = (window.STATE ||= {
   currentBuzzPlayer: null,
   buzzQueue: [],           // Array von Player-IDs in Buzz-Reihenfolge
   flashSeq: 0,             // Zähler für visuelle Effekte (Rand-Flash)
+  buzzDeadline: null,
 });
 
 // === Realtime (Broadcast) ===
@@ -82,8 +83,15 @@ const buzzerBtns    = $("buzzerBtns");
 const sidebar       = $("sidebar");
 const drawerScrim   = $("drawerScrim");
 const turnIndicator = $("turnIndicator");
+
+const buzzOverlay   = $("buzzOverlay");
+const buzzOverlayBtn = $("buzzOverlayBtn");
+const buzzTimerBar  = $("buzzTimerBar");
 // Button für Spieler-Buzz wird dynamisch erzeugt:
 let viewerBuzzBtn = $("viewerBuzzBtn");
+let buzzTimerInterval = null;
+let lastBuzzMode = false; // für Übergänge in onState
+
 
 // ===== Init =====
 (async function init(){
@@ -164,6 +172,16 @@ let viewerBuzzBtn = $("viewerBuzzBtn");
       viewerBuzzBtn = btn;
     }
   }
+
+  // Vollbild-Overlay-BUZZ-Button
+if (buzzOverlayBtn) {
+  buzzOverlayBtn.addEventListener("click", async () => {
+    await onLocalBuzz();
+    hideBuzzOverlay();
+  });
+}
+
+
   if (viewerBuzzBtn) {
     viewerBuzzBtn.addEventListener("click", onLocalBuzz);
     viewerBuzzBtn.disabled = true;
@@ -180,50 +198,37 @@ let viewerBuzzBtn = $("viewerBuzzBtn");
       onState: (state) => {
   if (!state) return;
 
+  // vorherigen Zustand merken
+  const prevBuzzMode = lastBuzzMode;
+
   STATE.boardIndex  = state.boardIndex ?? 0;
   STATE.used        = new Set(state.used || []);
   STATE.currentCell = state.currentCell || null;
   STATE.buzzMode    = !!state.buzzMode;
   STATE.buzzQueue   = Array.isArray(state.buzzQueue) ? state.buzzQueue : [];
 
-  // aktuellen Spieler aus ID ermitteln
-  if (Array.isArray(STATE.players) && state.currentPlayerId) {
-    const idx = STATE.players.findIndex(p => p.id === state.currentPlayerId);
-    if (idx >= 0) {
-      STATE.currentPlayerIndex = idx;
-    }
-  }
+  lastBuzzMode = STATE.buzzMode;
 
-  // aktuellen Buzz-Spieler aus Queue oder ID
-  if (Array.isArray(STATE.players) && STATE.buzzQueue.length) {
-    const first = STATE.players.find(p => p.id === STATE.buzzQueue[0]);
-    STATE.currentBuzzPlayer = first || null;
-  } else if (Array.isArray(STATE.players) && state.currentBuzzPlayerId) {
-    STATE.currentBuzzPlayer = STATE.players.find(p => p.id === state.currentBuzzPlayerId) || null;
-  } else {
-    STATE.currentBuzzPlayer = null;
-  }
-
-  // Board & Frage
-  renderBoard();
-  if (STATE.currentCell) {
-    showQuestion(STATE.currentCell);
-  } else {
-    showQuestion(null);
-  }
-
-  // Spieler-UI
-  renderPlayers();
-  highlightCurrentPlayer();
+  // ... Spieler ermitteln, Board rendern etc. (alles lassen wie es ist) ...
 
   // 🔥 Buzzer nur anhand von STATE.buzzMode steuern
   if (STATE.buzzMode) {
     openBuzzer();
+
+    // Spieler sehen das große Overlay nur beim Übergang von false -> true
+    if (!isHost && !prevBuzzMode && localCanBuzz()) {
+      showBuzzOverlay();
+    }
   } else {
     closeBuzzer();
+
+    // Overlay schließen, wenn die Buzzer-Phase endet
+    if (!isHost && prevBuzzMode) {
+      hideBuzzOverlay();
+    }
   }
 
-  // BUZZ!-Button für Spieler ✓/✗
+  // BUZZ!-Button für alte Buzzer-Leiste (falls sichtbar) ✓/✗
   if (viewerBuzzBtn) {
     viewerBuzzBtn.disabled = !localCanBuzz();
   }
@@ -624,6 +629,50 @@ function closeBuzzer(){
   if (viewerBuzzBtn) viewerBuzzBtn.disabled = true;
   updateMobileIndicator();
 }
+
+function showBuzzOverlay(){
+  if (isHost) return;                // Host sieht das Overlay nicht
+  if (!buzzOverlay || !buzzOverlayBtn || !buzzTimerBar) return;
+  if (!localCanBuzz()) return;
+
+  buzzOverlay.classList.remove("hidden");
+  buzzOverlay.setAttribute("aria-hidden", "false");
+
+  const duration = 10000;            // 10 Sekunden
+  const start = Date.now();
+  STATE.buzzDeadline = start + duration;
+
+  if (buzzTimerInterval) {
+    clearInterval(buzzTimerInterval);
+  }
+  buzzTimerBar.style.width = "100%";
+
+  buzzTimerInterval = setInterval(() => {
+    const now = Date.now();
+    const remaining = Math.max(0, STATE.buzzDeadline - now);
+    const pct = (remaining / duration) * 100;
+    buzzTimerBar.style.width = pct + "%";
+
+    if (remaining <= 0) {
+      clearInterval(buzzTimerInterval);
+      buzzTimerInterval = null;
+      hideBuzzOverlay();
+    }
+  }, 100);
+}
+
+function hideBuzzOverlay(){
+  if (buzzOverlay) {
+    buzzOverlay.classList.add("hidden");
+    buzzOverlay.setAttribute("aria-hidden", "true");
+  }
+  if (buzzTimerInterval) {
+    clearInterval(buzzTimerInterval);
+    buzzTimerInterval = null;
+  }
+  STATE.buzzDeadline = null;
+}
+
 
 
 // ===== End question + advance turn =====

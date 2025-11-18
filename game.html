@@ -73,25 +73,25 @@
           <button id="btnWrong" class="btn danger" type="button" disabled>Falsch</button>
         </div>
 
-        <!-- Buzzer -->
-        <!-- Buzzer -->
-<section id="buzzerBar" class="buzzer hidden">
-  <div class="buzzer-title">Buzzer offen – Host wählt, wer versucht zu antworten.</div>
+        <!-- Vollbild-Buzzer-Overlay (nur Spieler, nicht Host) -->
+<div id="buzzOverlay" class="buzz-overlay viewer-only hidden" aria-hidden="true">
+  <div class="buzz-dialog">
+    <div class="buzz-title">Buzz jetzt!</div>
 
-  <div class="buzzer-row">
-    <!-- Host: Übersicht, wer gerade buzzert / evtl. Zusatzinfos -->
-    <div id="buzzerBtns" class="buzzer-btns host-only">
-      <!-- Wir nutzen hier aktuell keine Buttons mehr für die Spieler-Auswahl,
-           aber lassen das DIV für spätere Erweiterungen drin -->
+    <button id="buzzOverlayBtn" class="btn buzz-btn" type="button">
+      BUZZ!
+    </button>
+
+    <div class="buzz-timer-wrap">
+      <div id="buzzTimerBar" class="buzz-timer-bar"></div>
     </div>
 
-    <!-- Viewer: Buzz-Button + Hinweis -->
-    <div class="buzzer-hint viewer-only">
-      <button id="viewerBuzzBtn" class="btn">BUZZ!</button>
-      <span>Meldet euch beim Host, wer buzzern will.</span>
+    <div class="buzz-subtitle">
+      Du hast 10&nbsp;Sekunden Zeit zu buzzern.
     </div>
   </div>
-</section>
+</div>
+
 
 
         <div id="status" class="status"></div>
