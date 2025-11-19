@@ -60,12 +60,15 @@ const STATE = (window.STATE ||= {
   currentBuzzPlayer: null,
   buzzQueue: [],           // Array von Player-IDs in Buzz-Reihenfolge
   flashSeq: 0,             // Zähler für visuelle Effekte (Rand-Flash)
-  buzzDeadline: null,      // Timestamp bis wann gebuzzert werden darf
+  buzzDeadline: null,      // Timestamp, bis wann gebuzzert werden darf
 });
 
 // === Realtime (Broadcast) ===
 let roomRT = null;
 let lastFlashSeqSeen = 0;
+
+// *** Neu: damit Overlay NICHT beim ersten State (Join) erscheint ***
+let hasInitialState = false;
 
 // ===== Elements =====
 const gameTitle     = $("gameTitle");
@@ -162,7 +165,7 @@ let lastBuzzMode = false; // für Übergänge in onState
   applyMobileHeights();
   updateMobileIndicator();
 
-  // BUZZ!-Button im unteren BuzzerBar ggf. erzeugen (falls im HTML nicht vorhanden)
+  // BUZZ!-Button im unteren BuzzerBar ggf. erzeugen
   if (!isHost && buzzerBar && !viewerBuzzBtn) {
     const hint = buzzerBar.querySelector(".buzzer-hint");
     if (hint) {
@@ -183,11 +186,11 @@ let lastBuzzMode = false; // für Übergänge in onState
     });
   }
 
-  // Klick auf kleinen BUZZ!-Button unten (optional)
+  // Klick auf kleinen BUZZ!-Button unten
   if (viewerBuzzBtn) {
     viewerBuzzBtn.addEventListener("click", async () => {
       await onLocalBuzz();
-      // Der kleine Button lässt das Overlay in Ruhe (für Handy/Tablet als Alternative)
+      // Overlay bleibt, falls offen (nur Alternative auf Handy)
     });
     viewerBuzzBtn.disabled = true;
   }
@@ -204,6 +207,8 @@ let lastBuzzMode = false; // für Übergänge in onState
         if (!state) return;
 
         const prevBuzzMode = lastBuzzMode;
+        const isFirstState = !hasInitialState;
+        hasInitialState = true;
 
         STATE.boardIndex  = state.boardIndex ?? 0;
         STATE.used        = new Set(state.used || []);
@@ -256,11 +261,15 @@ let lastBuzzMode = false; // für Übergänge in onState
           openBuzzer();
 
           if (!isHost) {
-            // Overlay nur beim Übergang von false -> true UND nur wenn wirklich eine Frage aktiv ist
-            if (!prevBuzzMode && STATE.currentCell && localCanBuzz()) {
+            // Overlay NUR:
+            // - nicht beim allerersten State (Join),
+            // - beim Wechsel false -> true
+            // - wenn wirklich eine Frage aktiv ist
+            // - und dieser Client buzzern darf
+            if (!isFirstState && !prevBuzzMode && STATE.currentCell && localCanBuzz()) {
               showBuzzOverlay();
             }
-            // Sobald der Host jemanden "dran genommen" hat (currentBuzzPlayer gesetzt) → Overlay weg
+            // Sobald Host jemanden "dran nimmt" → Overlay weg
             if (STATE.currentBuzzPlayer) {
               hideBuzzOverlay();
             }
@@ -443,11 +452,9 @@ function broadcastState(flashType) {
 }
 
 function getLocalPlayerId(){
-  // 1) Direkt aus sessionStorage lesen, falls schon gesetzt
   let id = sessionStorage.getItem("quiz:playerId");
   if (id) return id;
 
-  // 2) Fallback: über den gespeicherten Spielernamen den Spieler im STATE suchen
   const storedName = sessionStorage.getItem("quiz:playerName");
   if (!storedName || !Array.isArray(STATE.players) || !STATE.players.length) {
     return null;
@@ -458,7 +465,6 @@ function getLocalPlayerId(){
 
   const match = STATE.players.find(p => normalize(p.name) === target);
   if (match && match.id) {
-    // Einmal gefunden → in sessionStorage merken
     sessionStorage.setItem("quiz:playerId", match.id);
     return match.id;
   }
