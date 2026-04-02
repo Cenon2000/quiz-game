@@ -1,0 +1,80 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Basis-Layout: Vollbild & zentriert */
+html,
+body,
+#root {
+  height: 100%;
+  width: 100%;
+}
+
+/* Body-Styling */
+body {
+  margin: 0;
+  min-width: 320px;
+  background-color: #020617; /* Tailwind: bg-slate-950 */
+  color: #e5e7eb;           /* Tailwind: text-slate-200 */
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
+
+/* Root zentriert den App-Container (deine App.tsx) */
+#root {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  box-sizing: border-box;
+  padding: 1rem; /* entspricht p-4 */
+}
+
+/* Optional: Link-Styles (wenn du möchtest) */
+a {
+  font-weight: 500;
+  color: #6366f1; /* indigo-500 */
+  text-decoration: none;
+}
+a:hover {
+  color: #818cf8; /* indigo-400 */
+}
+
+/* Kategorie-Titel: Scroll-Effekt bei Hover */
+.cat-title {
+  position: relative;
+  overflow: hidden;
+}
+
+.cat-title-inner {
+  display: inline-block;
+  white-space: nowrap;
+}
+
+/* Beim Hover des gesamten Titels: Text einmal durchscrollen */
+.cat-title:hover .cat-title-inner {
+  animation: cat-scroll 6s linear 1;
+}
+
+@keyframes cat-scroll {
+  0% {
+    transform: translateX(100%);
+  }
+  100% {
+    transform: translateX(-100%);
+  }
+}
+
+.cat-scroll-container {
+  position: relative;
+  overflow: hidden;
+}
+
+.cat-scroll-text {
+  display: inline-block;
+  white-space: nowrap;
+  transition: transform 6s linear;
+}
+
+/* Beim Hover: Text läuft nach links, aber nur so weit wie nötig */
+.cat-scroll-container:hover .cat-scroll-text {
+  transform: translateX(calc(-100% + 100%));
+}
